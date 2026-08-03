@@ -1,9 +1,11 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "Node10",
+    // packages/shared ไม่มี "type": "module" → nodenext emit เป็น CommonJS
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist/cjs",
+    "rootDir": "src",
     "noEmit": false
   },
   "include": ["src"]

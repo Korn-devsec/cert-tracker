@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
+    // nodenext แทน commonjs/node (=node10 ซึ่ง deprecated ใน TS 7)
+    // apps/api ไม่มี "type": "module" ใน package.json → emit เป็น CommonJS ตามเดิม
+    // และ resolve "exports" map ของ @cert-tracker/shared ไปที่ dist/cjs ได้ถูกต้อง
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "declaration": true,
     "removeComments": false,
     "emitDecoratorMetadata": true,
@@ -10,8 +13,6 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,
