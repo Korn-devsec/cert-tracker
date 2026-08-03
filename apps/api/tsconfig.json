@@ -13,7 +13,12 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "sourceMap": true,
-    "incremental": true,
+    // ตั้งใจ "ไม่" เปิด incremental:
+    // nest-cli ตั้ง deleteOutDir: true (ลบ dist ก่อน build) แต่ .tsbuildinfo อยู่นอก dist
+    // จึงรอดจากการลบ แล้ว tsc คิดว่าไฟล์ที่ไม่ได้แก้ "emit ไปแล้ว" → ข้ามการเขียนไฟล์
+    // ผลคือ dist ขาดไฟล์แบบเงียบๆ จน `npm run dev:api` พังด้วย MODULE_NOT_FOUND
+    // (ย้าย buildinfo เข้า dist ก็ไม่นิ่ง เพราะชนกับจังหวะที่ deleteOutDir ลบโฟลเดอร์)
+    // build เต็มใช้เวลาประมาณ 2 วินาที แลกกับความถูกต้องคุ้มกว่า
     "skipLibCheck": true,
     "strict": true,
     "strictNullChecks": true,

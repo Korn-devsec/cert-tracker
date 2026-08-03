@@ -1,6 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
+import { CompaniesModule } from './companies/companies.module';
 import { HealthModule } from './health/health.module';
+import { HistoryModule } from './history/history.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -8,7 +14,16 @@ import { PrismaModule } from './prisma/prisma.module';
     // โหลด .env เข้า process.env ก่อน module อื่น (PrismaClient ต้องใช้ DATABASE_URL)
     ConfigModule.forRoot({ isGlobal: true, cache: true }),
     PrismaModule,
+    HistoryModule,
+    AuthModule,
+    CompaniesModule,
     HealthModule,
+  ],
+  providers: [
+    // ปิดทุก endpoint เป็นค่าเริ่มต้น — ต้องติด @Public() เพื่อเปิด (login, health)
+    // ลำดับสำคัญ: JwtAuthGuard ต้องมาก่อน RolesGuard เพราะ RolesGuard อ่าน request.user
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}

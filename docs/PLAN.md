@@ -58,15 +58,29 @@
 
 ## Phase 2 — Auth & Company Management
 
-- [ ] Auth: register (admin เท่านั้น), login (JWT), guard + RBAC decorator (admin/operator/viewer)
-- [ ] Company CRUD API: `GET/POST/PATCH/DELETE /companies` (delete = soft delete `isActive=false`)
-- [ ] Site CRUD ภายใต้ company (optional layer)
-- [ ] ทุก mutation ลง HistoryLog ระดับระบบ (ใครสร้าง/แก้บริษัทเมื่อไร)
-- [ ] e2e test: login → สร้างบริษัท → viewer สร้างบริษัทไม่ได้ (403)
+- [x] Auth: register (admin เท่านั้น), login (JWT), guard + RBAC decorator (admin/operator/viewer)
+      — `POST /auth/login`, `POST /auth/register` (ADMIN), `GET /auth/me`
+      — `JwtAuthGuard` + `RolesGuard` เป็น **global guard**: ทุก endpoint ปิดเป็นค่าเริ่มต้น เปิดด้วย `@Public()` (มีแค่ login กับ health)
+      — ใช้ `@nestjs/jwt` ตรงๆ ไม่ใช้ passport (ดู DECISIONS.md)
+- [x] Company CRUD API: `GET/POST/PATCH/DELETE /companies` (delete = soft delete `isActive=false`)
+      — `GET /companies?includeInactive=&search=`, `GET /companies/:id` (พร้อม sites + จำนวน cert)
+      — `code` แก้ไม่ได้หลังสร้าง และบันทึกเป็นตัวพิมพ์ใหญ่เสมอ
+- [x] Site CRUD ภายใต้ company (optional layer) — `/companies/:companyId/sites` (ADMIN + OPERATOR)
+      — ลบ site ที่ยังมี certificate ผูกอยู่ไม่ได้ → 409 (กัน cert หลุด site แบบเงียบๆ)
+- [x] ทุก mutation ลง HistoryLog ระดับระบบ (ใครสร้าง/แก้บริษัทเมื่อไร)
+      — ผ่าน `HistoryService` และเขียนอยู่ใน `$transaction` เดียวกับ mutation (ไม่มีกรณี "แก้สำเร็จแต่ประวัติหาย")
+      — เพิ่ม action `SITE_DELETED`, `USER_CREATED`, `USER_UPDATED` + migration `20260803095940_...`
+- [x] e2e test: login → สร้างบริษัท → viewer สร้างบริษัทไม่ได้ (403) — `test/auth-companies.e2e-spec.ts` 19 เคส
 
 **เกณฑ์ตรวจรับ:**
-- ยิงผ่าน curl/Postman ได้ครบ, token หมดอายุ/ปลอมต้องโดน 401
-- viewer ทำได้แค่อ่าน
+- [x] ยิงผ่าน curl ได้ครบ, token หมดอายุ/ปลอมต้องโดน 401 — ทดสอบทั้ง curl จริงและใน e2e
+      (ไม่ส่ง token / เซ็นด้วย secret อื่น / `expiresIn: -1s` / บัญชีถูกปิดใช้งาน → 401 ทุกกรณี)
+- [x] viewer ทำได้แค่อ่าน — GET ผ่าน 200 ส่วน POST/PATCH/DELETE companies และ register โดน 403
+
+> **แก้บั๊กที่เจอระหว่างทำเฟสนี้:** `npm run dev:api` พังด้วย `MODULE_NOT_FOUND`
+> เพราะ `incremental: true` ใน tsconfig ชนกับ `deleteOutDir: true` ของ nest-cli —
+> `.tsbuildinfo` อยู่นอก `dist` จึงรอดจากการลบ แล้ว tsc ข้าม emit ไฟล์ที่ไม่ได้แก้ ทำให้ `dist` ขาดไฟล์เงียบๆ
+> (test ทั้งหมดผ่านเพราะ jest ใช้ ts-jest คอมไพล์เอง ไม่ได้อ่าน `dist`) → ปิด `incremental` ทิ้ง
 
 ---
 
