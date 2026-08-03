@@ -47,9 +47,12 @@ describe('Auth + Companies (e2e)', () => {
   }, 30_000);
 
   afterAll(async () => {
-    // ลบตามลำดับ: history → company → user (history อ้างถึง company)
+    // ลบเฉพาะข้อมูลที่เทสต์นี้สร้างเท่านั้น (อ้างด้วย id/อีเมลตรงตัว)
+    // ห้ามลบด้วยเงื่อนไขกว้างอย่าง code startsWith 'E2E' เพราะจะไปลบข้อมูลของ e2e ไฟล์อื่น
     await prisma.historyLog.deleteMany({ where: { actor: { in: [ADMIN_EMAIL, VIEWER_EMAIL] } } });
-    await prisma.company.deleteMany({ where: { code: { startsWith: 'E2E' } } });
+    if (createdCompanyId !== undefined) {
+      await prisma.company.deleteMany({ where: { id: createdCompanyId } });
+    }
     await prisma.user.deleteMany({ where: { email: { in: [ADMIN_EMAIL, VIEWER_EMAIL] } } });
     await prisma.$disconnect();
     await app.close();

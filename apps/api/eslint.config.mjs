@@ -26,6 +26,11 @@ export default tseslint.config(
     },
   },
   {
+    // สคริปต์ .mjs เป็น JavaScript ล้วน ประกาศ return type ไม่ได้
+    files: ['**/*.mjs'],
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
+  },
+  {
     files: ['**/*.spec.ts', 'test/**/*.ts'],
     languageOptions: {
       globals: {

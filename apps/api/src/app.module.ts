@@ -7,6 +7,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { CompaniesModule } from './companies/companies.module';
 import { HealthModule } from './health/health.module';
 import { HistoryModule } from './history/history.module';
+import { ImportsModule } from './imports/imports.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -17,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
     HistoryModule,
     AuthModule,
     CompaniesModule,
+    ImportsModule,
     HealthModule,
   ],
   providers: [

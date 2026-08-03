@@ -4,7 +4,7 @@
 > ทำทีละเฟสตามลำดับ ติ๊ก `[x]` เมื่อเสร็จ และ**หยุดรอผู้ใช้ตรวจ**เมื่อจบแต่ละเฟส
 > ห้ามเริ่มเฟสถัดไปจนกว่าผู้ใช้จะพิมพ์ยืนยัน เช่น "ผ่าน เริ่มเฟสถัดไปได้"
 
-**สถานะปัจจุบัน:** Phase 0 ตรวจผ่านและ commit แล้ว · Phase 1 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 2
+**สถานะปัจจุบัน:** Phase 0–2 ตรวจผ่านและ push แล้ว · Phase 3 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 4
 
 ---
 
@@ -91,38 +91,62 @@
 > header มี typo (`Onwer`), status เป็นภาษาไทยและมี trailing space,
 > Endpoints หลายค่าในเซลล์เดียวคั่นด้วย newline, Expires เป็น ISO datetime
 
-- [ ] Endpoint `POST /imports` รับไฟล์ .xlsx + `companyId` (บังคับเลือกบริษัทก่อนเสมอ) + เลือก sheet ได้
-- [ ] **Sheet detection:** list ทุก sheet ให้ผู้ใช้เลือก และ/หรือ auto-suggest sheet ที่เจอ header ครบ (ข้าม sheet หน้าปกอย่าง "Report")
-- [ ] **Header row auto-detection:** สแกนหาแถวที่มี header ที่รู้จักครบตามเกณฑ์ (ห้าม assume ว่าเป็นแถวแรก — ไฟล์จริง header อยู่แถว 3)
-- [ ] อ่าน **จากชื่อ header เท่านั้น** ห้ามอ้างตำแหน่งคอลัมน์
-- [ ] Header Mapping (case-insensitive, trim, รองรับ typo ที่เจอในไฟล์จริง):
-  - `Common Name` / `Certificate Name` / `CN` → `commonName`
-  - `Endpoints` / `Endpoint` → `endpoint`
-  - `Expires` / `Expiry Date` / `Expiration` → `expiresAt` (parse ISO datetime เช่น `2026-09-18T12:25:54`)
-  - `Days Until` / `Days Until Expiry` → `daysUntilExpiry`
-  - `Owner` / `Onwer` (typo ที่เจอจริง) → `owner`
-  - `Issuer` → `issuer`
-  - `Signing Algorithm` / `Signature Algorithm` → `signatureAlgorithm`
-  - `Status` → `status`, `Remark` → `remark`, `No` / `No.` → ข้าม (ลำดับ ไม่ต้อง import)
-- [ ] **Status Mapping ภาษาไทย** (trim ก่อนเสมอ — ไฟล์จริงมี "ดำเนินการแล้ว " มีช่องว่างท้าย):
-  - `อยู่ระหว่างดำเนินการ` / `Pending` → task status เริ่มต้นตาม workflow
-  - `ดำเนินการแล้ว` / `เรียบร้อยแล้ว` / `Done` / `Completed` → `Completed`
-  - ค่าที่ map ไม่ได้ → รายงานเป็น warning พร้อมเลขแถว
-- [ ] **Endpoints หลายค่า:** เซลล์เดียวมีหลาย endpoint คั่นด้วย newline → split เป็นหลายรายการ (หรือเก็บเป็น array) ตัดสินใจแล้วบันทึกลง DECISIONS.md
-- [ ] Validation: header จำเป็น (`commonName`, `expiresAt` หรือ `daysUntilExpiry`) หาย → reject ทั้งไฟล์ พร้อม error บอกชื่อคอลัมน์ที่หาย
-- [ ] Validation รายแถว: วันที่ parse ไม่ได้ / commonName ว่าง → รายงานเลขแถว+เหตุผล, มีโหมด strict (reject ทั้งไฟล์) เป็น default
-- [ ] Normalize: trim ทุก field, แปลงวันที่เป็น UTC, dedupe ภายในไฟล์ (commonName+endpoint ซ้ำ)
-- [ ] Upsert: cert เดิม (companyId+commonName+endpoint ตรงกัน) → update, ใหม่ → create
-- [ ] บันทึก `ImportBatch` (ไฟล์, ผู้ import, จำนวนแถว, ผลลัพธ์) + HistoryLog ต่อ cert
-- [ ] สร้าง `RenewalTask` status `New` อัตโนมัติสำหรับ cert ที่ risk ≠ Safe และยังไม่มี task ค้าง
-- [ ] Unit test ครบชุด: header อยู่แถว 3 / header สลับตำแหน่ง / header ชื่อ alias+typo (`Onwer`) / header จำเป็นหาย / status ไทยมี trailing space / endpoints หลายค่าใน cell เดียว / แถวข้อมูลพัง / import ซ้ำต้อง upsert ไม่สร้างซ้ำ
-- [ ] เตรียมไฟล์ทดสอบใน `apps/api/test/fixtures/`: คัดลอก `docs/samples/30-July-2026.xlsx` (ไฟล์จริง) + สร้างเพิ่ม: ไฟล์สลับคอลัมน์, ไฟล์คอลัมน์หาย
+- [x] Endpoint `POST /imports` รับไฟล์ .xlsx + `companyId` (บังคับเลือกบริษัทก่อนเสมอ) + เลือก sheet ได้
+      — เพิ่ม `dryRun=true` สำหรับ preview ก่อน confirm (หน้า Import ใน Phase 7 ต้องใช้)
+      — เพิ่ม `POST /imports/inspect`, `GET /imports`, `GET /imports/:id` · สิทธิ์: import = ADMIN/OPERATOR, อ่านประวัติ = ทุก role
+- [x] **Sheet detection:** list ทุก sheet ให้ผู้ใช้เลือก และ auto-suggest sheet ที่คอลัมน์ครบที่สุด
+      — เกณฑ์แนะนำ: จำนวนฟิลด์ที่ map ได้ → จำนวนแถว → ลำดับในไฟล์
+      — **ข้อค้นพบ:** sheet `Report` ไม่ใช่หน้าปกเปล่า แต่เป็นตารางข้อมูลที่ merge cell ไว้ (ขาด Owner/Status)
+        จึงไม่ block ตามชื่อ sheet แต่ให้คะแนนตามความครบของคอลัมน์ (ดู DECISIONS.md)
+- [x] **Header row auto-detection:** สแกน 20 แถวแรก เลือกแถวที่ map ฟิลด์ได้มากสุด (ต้องได้ ≥ 3 ฟิลด์)
+      — ไฟล์จริง header อยู่แถว 3 · sheet `Report` อยู่แถว 7 · ทั้งสองกรณีตรวจเจอถูกต้อง
+      — ข้ามแถว header ที่ซ้ำจากการ merge แนวตั้ง (ไม่งั้นได้ cert ปลอมชื่อ "Common Name")
+- [x] อ่าน **จากชื่อ header เท่านั้น** ห้ามอ้างตำแหน่งคอลัมน์ — มีเทสต์สลับคอลัมน์พิสูจน์
+- [x] Header Mapping (case-insensitive, trim, รองรับ typo ที่เจอในไฟล์จริง) — ครบทุก alias ตามสเปก
+      — `No` / `No.` ถูกข้าม · `Onwer` → `owner` · ตัดจุด/ทวิภาคท้ายชื่อ · จัดการ NBSP/zero-width space
+      — header ที่ไม่รู้จัก และ header ที่ซ้ำ → warning (ใช้คอลัมน์แรก) ไม่ทำให้ import ล้ม
+- [x] **Status Mapping ภาษาไทย** (trim ก่อนเสมอ)
+      — `"ดำเนินการแล้ว "` (ช่องว่างท้ายจริงในไฟล์) → `COMPLETED`
+      — `อยู่ระหว่างดำเนินการ` / `Pending` → `NEW` (สถานะเริ่มต้นของ workflow — เหตุผลใน DECISIONS.md)
+      — ค่าที่ map ไม่ได้ → warning พร้อมเลขแถว
+- [x] **Endpoints หลายค่า:** split เป็นหลาย Certificate record (ตัดสินใจแล้ว บันทึกใน DECISIONS.md)
+      — ไฟล์จริงแถว 6 มี 2 endpoint คั่นด้วย newline → 6 แถวข้อมูลกลายเป็น 7 รายการ
+- [x] Validation: header จำเป็น (`commonName`, `expiresAt` หรือ `daysUntilExpiry`) หาย → reject ทั้งไฟล์
+      พร้อม error บอกคอลัมน์ที่หาย + ชื่อ header ที่ระบบยอมรับ + header ที่เจอในไฟล์
+- [x] Validation รายแถว: วันที่ parse ไม่ได้ / commonName ว่าง → รายงานเลขแถว+เหตุผล, strict เป็น default
+      — ปฏิเสธรูปแบบ `18/09/2026` เพราะกำกวม และจับวันที่ที่ไม่มีจริง (`2026-02-31`)
+- [x] Normalize: trim ทุก field, แปลงวันที่เป็น UTC, dedupe ภายในไฟล์ (commonName+endpoint ซ้ำ)
+- [x] Upsert: cert เดิม (companyId+commonName+endpoint ตรงกัน) → update, ใหม่ → create
+      — update ไม่ล้างค่าที่ไฟล์ไม่มี (กันข้อมูลที่คนกรอกเพิ่มในระบบหาย)
+- [x] บันทึก `ImportBatch` (ไฟล์, sheet, ผู้ import, จำนวนแถว, created/updated/skipped, errors, warnings) + HistoryLog ต่อ cert
+- [x] สร้าง `RenewalTask` status `New` อัตโนมัติสำหรับ cert ที่ risk ≠ Safe และยังไม่มี task ค้าง
+      — ไฟล์บอก `Completed` → สร้าง task COMPLETED · import ไม่แก้สถานะ task ที่มีอยู่แล้ว (ดู DECISIONS.md)
+- [x] Unit test ครบชุด: header แถว 3 / สลับตำแหน่ง / alias+typo (`Onwer`) / header จำเป็นหาย /
+      status ไทยมี trailing space / endpoints หลายค่า / แถวข้อมูลพัง / import ซ้ำต้อง upsert ไม่สร้างซ้ำ
+- [x] เตรียมไฟล์ทดสอบใน `apps/api/test/fixtures/`: ไฟล์จริง + `columns-swapped.xlsx` +
+      `missing-expiry.xlsx` + `broken-rows.xlsx` (สร้างใหม่ได้ด้วย `node test/fixtures/build-fixtures.mjs`)
 
 **เกณฑ์ตรวจรับ:**
-- Import `docs/samples/30-July-2026.xlsx` (sheet `Report-SSL-Jul-2026`) สำเร็จ ข้อมูลเข้า DB ครบทุกแถว ผูก company ถูก status ไทยถูก map ถูกต้อง
-- ไฟล์สลับคอลัมน์ → import ผ่านเหมือนเดิม
-- ไฟล์ที่ลบคอลัมน์ `Days Until`/`Expires` ออก → reject พร้อมข้อความชัดเจน
-- Import ไฟล์เดิมซ้ำ → จำนวน cert ใน DB ไม่เพิ่ม
+
+- [x] Import `docs/samples/30-July-2026.xlsx` (sheet `Report-SSL-Jul-2026`) สำเร็จ — 6 แถว → **7 cert**
+      ผูก company ถูก, status ไทย map ถูก (สร้าง RenewalTask `NEW` 7 งาน), `expiresAt` ตรงไฟล์เป็น UTC
+- [x] ไฟล์สลับคอลัมน์ → import ผ่านเหมือนเดิม (typo `Onwer` ยัง map เป็น owner)
+- [x] ไฟล์ที่ลบคอลัมน์ `Days Until`/`Expires` ออก → reject ทั้งไฟล์ พร้อมข้อความชัดเจน
+- [x] Import ไฟล์เดิมซ้ำ → จำนวน cert ใน DB ไม่เพิ่ม (`created: 0, updated: 7`)
+
+> **สิ่งที่เจอจากการอ่านไฟล์จริง (สำคัญต่อเฟสถัดไป):**
+> คอลัมน์ `Days Until Expiry` ในไฟล์คำนวณจาก**วันสแกน** ไม่ใช่วันในชื่อรายงาน —
+> sheet Jun เขียน "Report on 17-Jun-2026" แต่เลข 80/30 คำนวณจาก 2026-06-30
+> (ตรวจย้อนได้จาก `2026-09-18 − 80 วัน`) ยืนยันว่าการไม่เก็บค่านี้ลง DB ใน Phase 1 ถูกต้อง
+>
+> **บั๊กที่แก้ระหว่างเฟสนี้:**
+> 1. `deleteOutDir: true` ของ nest-cli พังอีกแบบบน Windows — `ENOTEMPTY: rmdir dist\\imports\\dto`
+>    ทำให้ `npm run dev:api` ไม่ขึ้น → ตั้ง `deleteOutDir: false` + เพิ่มสคริปต์ `npm run clean`
+> 2. e2e ของ Phase 2 cleanup ด้วย `code startsWith 'E2E'` ไปลบข้อมูลของ e2e ไฟล์อื่นกลางการทดสอบ
+>    (jest รันหลาย spec ขนานกันบน DB เดียว) ทำให้เห็นเป็นบั๊กใน service ทั้งที่เป็นบั๊กในเทสต์
+>    → แก้ให้ cleanup เจาะจง id ที่ตัวเองสร้าง + เพิ่ม `--runInBand`
+> 3. โค้ด normalize ช่องว่างเขียน `.replace(/ /g, ' ')` ด้วยช่องว่างปกติทั้งสองตัว = **no-op ที่ดูเหมือนทำงาน**
+>    → ย้ายไปรวมที่ `excel/text.ts` และเขียนเป็น escape `\uXXXX`
 
 ---
 
@@ -218,4 +242,6 @@
 | วันที่ | เฟส | สรุป | ผู้ตรวจยืนยัน |
 |---|---|---|---|
 | 2026-08-03 | Phase 0 | วาง monorepo (npm workspaces) + docker-compose (PostgreSQL 16) + NestJS 11/Prisma 6 + Vite 6/React 18 + packages/shared (enums+label ไทย) + ESLint/Prettier + git init — `GET /health` ตอบ `{status:"ok",db:"connected"}`, test ผ่าน 9/9 | ✅ ผ่าน (commit `4e6bef2`) |
-| 2026-08-03 | Phase 1 | Prisma schema 9 model + 6 enum, migration `init`, seed (2 บริษัท + admin, idempotent), `calculateRisk`/`calculateDaysUntilExpiry`/`isExpired` ใน packages/shared, password util (scrypt), enum parity test — test ผ่าน 50/50 | รอตรวจ |
+| 2026-08-03 | Phase 1 | Prisma schema 9 model + 6 enum, migration `init`, seed (2 บริษัท + admin, idempotent), `calculateRisk`/`calculateDaysUntilExpiry`/`isExpired` ใน packages/shared, password util (scrypt), enum parity test — test ผ่าน 50/50 | ✅ ผ่าน (commit `ca5dd4d`) |
+| 2026-08-03 | Phase 2 | JWT auth + RBAC (global guard, ปิดทุก endpoint เป็นค่าเริ่มต้น), Company CRUD + soft delete, Site CRUD, HistoryService เขียนประวัติใน transaction เดียวกับ mutation — test ผ่าน 97/97 (unit 78 + e2e 19) | ✅ ผ่าน (commit `3f154f0`) |
+| 2026-08-03 | Phase 3 | Excel Import Service: sheet/header auto-detect, header mapping (+typo `Onwer`), status ไทย (+trailing space), split endpoint หลายค่า, strict validation, upsert, ImportBatch + HistoryLog + RenewalTask อัตโนมัติ, `dryRun` preview — test ผ่าน 212/212 (unit 172 + e2e 40) | รอตรวจ |
