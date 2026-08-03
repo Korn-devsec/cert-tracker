@@ -217,6 +217,35 @@ export interface ImportBatchSummary {
   company: { code: string; name: string };
 }
 
+// ===== รายงาน (Phase 8) =====
+
+export interface MonthlyBucket {
+  month: string;
+  monthLabel: string;
+  total: number;
+  byRisk: Record<RiskLevel, number>;
+  byStatus: Record<WorkStatus, number>;
+  noTask: number;
+  completed: number;
+  pending: number;
+  cancelled: number;
+  expired: number;
+}
+
+export interface MonthlyReport {
+  asOf: string;
+  companyId: string | null;
+  companyName: string | null;
+  current: MonthlyBucket;
+  previous: MonthlyBucket;
+  delta: {
+    total: number;
+    byRisk: Record<RiskLevel, number>;
+    completed: number;
+    pending: number;
+  };
+}
+
 export interface RiskStatusBreakdown {
   done: number;
   pending: number;

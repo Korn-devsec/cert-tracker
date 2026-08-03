@@ -7,7 +7,7 @@
  * ช่องทางทำงานในโหมดซ้อม (`NOTIFICATION_DRY_RUN=true`) จึงไม่มีอีเมล/LINE ออกไปจริง
  * ต้องมี PostgreSQL รันอยู่ (`docker compose up -d db`)
  */
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import {
   NotificationChannel,
@@ -18,6 +18,7 @@ import {
 } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/bootstrap';
 import { hashPassword } from '../src/common/password';
 import { NotificationsService } from '../src/notifications/notifications.service';
 
@@ -61,7 +62,7 @@ const EXPECTED_NOTIFIED = 5;
 const EXPECTED_SCANNED = 6; // ทั้งหมดยกเว้นใบ 200 วัน
 
 describe('Notifications (e2e) — Phase 5', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let prisma: PrismaClient;
   let service: NotificationsService;
   let adminToken: string;
@@ -124,10 +125,9 @@ describe('Notifications (e2e) — Phase 5', () => {
     }
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-    );
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    // ใช้การตั้งค่าชุดเดียวกับ main.ts (helmet, CORS, ValidationPipe) เพื่อให้เทสต์ตรงกับของจริง
+    configureApp(app);
     await app.init();
     service = app.get(NotificationsService);
 

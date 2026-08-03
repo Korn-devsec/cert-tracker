@@ -12,6 +12,7 @@ import { HistoryModule } from './history/history.module';
 import { ImportsModule } from './imports/imports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReportsModule } from './reports/reports.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UsersModule } from './users/users.module';
 
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module';
     TasksModule,
     DashboardModule,
     NotificationsModule,
+    ReportsModule,
     HealthModule,
   ],
   providers: [

@@ -5,12 +5,13 @@
  * ต้องมี PostgreSQL รันอยู่ (`docker compose up -d db`) และ migrate แล้ว
  * ข้อมูลที่สร้างในเทสต์ใช้ prefix `e2e-` และถูกลบทิ้งใน afterAll
  */
-import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { PrismaClient, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/bootstrap';
 import { hashPassword } from '../src/common/password';
 
 const RUN_ID = process.env.E2E_RUN_ID ?? String(process.hrtime.bigint());
@@ -20,7 +21,7 @@ const PASSWORD = 'E2e-Passw0rd!';
 const COMPANY_CODE = `E2E${RUN_ID}`.slice(0, 20);
 
 describe('Auth + Companies (e2e)', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let prisma: PrismaClient;
   let jwtService: JwtService;
   let adminToken: string;
@@ -38,10 +39,9 @@ describe('Auth + Companies (e2e)', () => {
     });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-    );
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    // ใช้การตั้งค่าชุดเดียวกับ main.ts (helmet, CORS, ValidationPipe) เพื่อให้เทสต์ตรงกับของจริง
+    configureApp(app);
     await app.init();
     jwtService = app.get(JwtService);
   }, 30_000);

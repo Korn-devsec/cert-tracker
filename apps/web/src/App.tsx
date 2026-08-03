@@ -6,7 +6,7 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ImportPage } from './pages/ImportPage';
 import { LoginPage } from './pages/LoginPage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { TasksPage } from './pages/TasksPage';
 import { UsersPage } from './pages/UsersPage';
 
@@ -23,16 +23,7 @@ export function App(): React.JSX.Element {
         <Route path="/certificates/:id" element={<CertificateDetailPage />} />
         <Route path="/import" element={<ImportPage />} />
         <Route path="/tasks" element={<TasksPage />} />
-        <Route
-          path="/reports"
-          element={
-            <PlaceholderPage
-              title="รายงาน"
-              phase="Phase 8"
-              description="ส่งออกรายงาน Excel รายเดือน/รายบริษัท"
-            />
-          }
-        />
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<UsersPage />} />
       </Route>
 

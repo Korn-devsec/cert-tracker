@@ -7,12 +7,13 @@
  * รวมการตรวจ `/users` ที่เพิ่มใน Phase 7 (หน้า Settings/Users + dropdown ผู้รับผิดชอบ)
  * ต้องมี PostgreSQL รันอยู่ (`docker compose up -d db`)
  */
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { PrismaClient, UserRole, WorkStatus } from '@prisma/client';
 import { join } from 'node:path';
 import request, { type Test as SupertestRequest } from 'supertest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/bootstrap';
 import { hashPassword } from '../src/common/password';
 
 const REAL_FILE = join(__dirname, 'fixtures', '30-July-2026.xlsx');
@@ -28,7 +29,7 @@ const PASSWORD = 'E2e-Passw0rd!';
 const COMPANY_CODE = `E2EFLOW${RUN_ID}`.slice(0, 18);
 
 describe('Full flow (e2e) — Phase 7', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let prisma: PrismaClient;
   let adminToken: string;
   let operatorToken: string;
@@ -61,10 +62,9 @@ describe('Full flow (e2e) — Phase 7', () => {
     operatorId = (await prisma.user.findUniqueOrThrow({ where: { email: OPERATOR_EMAIL } })).id;
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-    );
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    // ใช้การตั้งค่าชุดเดียวกับ main.ts (helmet, CORS, ValidationPipe) เพื่อให้เทสต์ตรงกับของจริง
+    configureApp(app);
     await app.init();
 
     const login = async (email: string): Promise<string> => {

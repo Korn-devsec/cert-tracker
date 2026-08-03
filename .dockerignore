@@ -1,0 +1,23 @@
+# ไฟล์ที่ไม่ต้องส่งเข้า build context (เร็วขึ้นและกัน secret หลุดเข้า image)
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+
+.git
+.github
+.vscode
+.idea
+
+# ห้ามส่ง .env จริงเข้า image — ค่าคอนฟิกส่งผ่าน environment ของ compose
+.env
+**/.env
+**/.env.local
+
+# ไฟล์แนบที่ผู้ใช้อัปโหลดบนเครื่อง dev
+apps/api/uploads
+
+docs
+legacy
+*.md

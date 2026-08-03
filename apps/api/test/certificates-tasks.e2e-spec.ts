@@ -7,7 +7,7 @@
  *
  * ต้องมี PostgreSQL รันอยู่ (`docker compose up -d db`)
  */
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { PrismaClient, UserRole, WorkStatus } from '@prisma/client';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request, { type Test as SupertestRequest } from 'supertest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/bootstrap';
 import { hashPassword } from '../src/common/password';
 import { OPEN_TASK_STATUSES } from '../src/tasks/transitions';
 
@@ -49,7 +50,7 @@ const SEEDS: CertificateSeed[] = [
 ];
 
 describe('Certificates / Tasks / Dashboard (e2e) — Phase 4', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let prisma: PrismaClient;
   let adminToken: string;
   let operatorToken: string;
@@ -124,10 +125,9 @@ describe('Certificates / Tasks / Dashboard (e2e) — Phase 4', () => {
     }
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-    );
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    // ใช้การตั้งค่าชุดเดียวกับ main.ts (helmet, CORS, ValidationPipe) เพื่อให้เทสต์ตรงกับของจริง
+    configureApp(app);
     await app.init();
 
     const login = async (email: string): Promise<string> => {

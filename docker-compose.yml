@@ -1,5 +1,9 @@
-# Phase 0: มีแค่ service `db`
-# service `api` / `web` จะเพิ่มใน Phase 8 (Docker Compose production)
+# ระบบทั้งชุด: db (PostgreSQL) + api (NestJS) + web (nginx เสิร์ฟ SPA และ proxy /api)
+#
+#   ใช้งานจริง:  docker compose up -d --build      → เปิด http://localhost:8080
+#   เฉพาะ dev:   docker compose up -d db           → รัน api/web จากเครื่องด้วย npm
+#
+# ค่าคอนฟิกทั้งหมดมาจาก `.env` ที่ root (คัดลอกจาก .env.example) — ไม่ฝัง secret ในไฟล์นี้
 services:
   db:
     image: postgres:16-alpine
@@ -24,6 +28,74 @@ services:
       retries: 5
       start_period: 10s
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: cert-tracker-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        # รอให้ DB พร้อมจริงก่อน ไม่ใช่แค่ container ขึ้น (migration ตอนสตาร์ทต้องต่อ DB ได้)
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      TZ: ${TZ:-Asia/Bangkok}
+      # ต่อ DB ผ่านชื่อ service ในเครือข่ายของ compose (พอร์ตภายในคือ 5432 เสมอ)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-certtracker}:${POSTGRES_PASSWORD:-certtracker}@db:5432/${POSTGRES_DB:-cert_tracker}?schema=public
+      # หน้าเว็บเรียก API ผ่าน nginx (same-origin) จึงไม่ต้องเปิด CORS ให้ origin ภายนอก
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+      # ไม่ใส่ค่า default ให้ secret — ถ้าไม่ได้ตั้ง api จะปฏิเสธการเริ่มระบบเองพร้อมบอกว่าขาดอะไร
+      # (ตรวจใน apps/api/src/common/env-check.ts — ทำที่ระดับแอปเพื่อไม่ให้ `compose up -d db` ของ dev พัง)
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      RUN_SEED_ON_START: ${RUN_SEED_ON_START:-true}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
+      LOGIN_RATE_LIMIT: ${LOGIN_RATE_LIMIT:-5}
+      LOGIN_RATE_WINDOW_SECONDS: ${LOGIN_RATE_WINDOW_SECONDS:-60}
+      # แจ้งเตือน (Phase 5) — ค่าเริ่มต้นเป็นโหมดซ้อม ไม่ส่งออกจริงจนกว่าจะตั้ง SMTP/LINE
+      NOTIFICATION_DRY_RUN: ${NOTIFICATION_DRY_RUN:-true}
+      NOTIFICATION_CRON: ${NOTIFICATION_CRON:-0 8 * * *}
+      NOTIFICATION_TIMEZONE: ${NOTIFICATION_TIMEZONE:-Asia/Bangkok}
+      NOTIFICATION_CRON_ENABLED: ${NOTIFICATION_CRON_ENABLED:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-cert-tracker@example.com}
+      MAIL_TO_FALLBACK: ${MAIL_TO_FALLBACK:-}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN:-}
+      LINE_TO: ${LINE_TO:-}
+    volumes:
+      # ไฟล์แนบต้องอยู่รอดเมื่อ container ถูกสร้างใหม่
+      - uploads:/app/uploads
+    ports:
+      # เปิดไว้เพื่อ debug/ยิง API ตรง — ผู้ใช้ทั่วไปเข้าผ่าน web (พอร์ต 8080)
+      - '${API_PORT:-3000}:3000'
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # เรียก API ผ่าน path เดียวกับหน้าเว็บ แล้ว nginx proxy ต่อให้
+        VITE_API_BASE_URL: /api
+    container_name: cert-tracker-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      TZ: ${TZ:-Asia/Bangkok}
+    ports:
+      - '${WEB_PORT:-8080}:80'
+
 volumes:
   pgdata:
     name: cert-tracker-pgdata
+  uploads:
+    name: cert-tracker-uploads

@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  PayloadTooLargeException,
   Post,
   Query,
   UploadedFile,
@@ -12,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
+import { looksLikeXlsx } from './excel/xlsx-signature';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -67,7 +69,10 @@ export class ImportsController {
   }
 }
 
-/** ตรวจว่าเป็นไฟล์ .xlsx จริง — การตรวจเชิงลึก/ขนาดละเอียดอยู่ใน Phase 8 */
+/**
+ * ตรวจว่าเป็นไฟล์ .xlsx จริง — นามสกุล + mime type + **ลายเซ็นไบต์แรกของไฟล์** (Phase 8)
+ * ชื่อไฟล์และ mime type ที่ client ส่งมาปลอมได้ ไบต์แรกของไฟล์ปลอมไม่ได้
+ */
 function assertXlsx(file?: Express.Multer.File): Express.Multer.File {
   if (file === undefined) {
     throw new BadRequestException('ต้องแนบไฟล์ .xlsx ในฟิลด์ชื่อ "file"');
@@ -81,8 +86,19 @@ function assertXlsx(file?: Express.Multer.File): Express.Multer.File {
   if (!XLSX_MIME_TYPES.includes(file.mimetype)) {
     throw new BadRequestException(`ชนิดไฟล์ไม่ถูกต้อง: ${file.mimetype}`);
   }
-  if (file.size === 0) {
+  if (file.size === 0 || file.buffer.length === 0) {
     throw new BadRequestException('ไฟล์ว่าง');
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new PayloadTooLargeException(
+      `ไฟล์ใหญ่เกิน ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB`,
+    );
+  }
+  if (!looksLikeXlsx(file.buffer)) {
+    throw new BadRequestException(
+      `เนื้อไฟล์ "${file.originalname}" ไม่ใช่ .xlsx จริง (ไฟล์ .xlsx ต้องเป็นรูปแบบ ZIP/OOXML) — ` +
+        'ถ้าเป็น .csv หรือ .xls ให้บันทึกเป็น .xlsx ก่อน',
+    );
   }
   return file;
 }

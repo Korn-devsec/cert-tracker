@@ -4,7 +4,7 @@
 > ทำทีละเฟสตามลำดับ ติ๊ก `[x]` เมื่อเสร็จ และ**หยุดรอผู้ใช้ตรวจ**เมื่อจบแต่ละเฟส
 > ห้ามเริ่มเฟสถัดไปจนกว่าผู้ใช้จะพิมพ์ยืนยัน เช่น "ผ่าน เริ่มเฟสถัดไปได้"
 
-**สถานะปัจจุบัน:** Phase 0–6 ตรวจผ่านและ push แล้ว · Phase 7 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 8
+**สถานะปัจจุบัน:** Phase 0–7 ตรวจผ่านและ push แล้ว · Phase 8 (เฟสสุดท้าย) ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ**
 
 ---
 
@@ -308,16 +308,51 @@
 
 ## Phase 8 — Reports, Export & Hardening
 
-- [ ] Export รายงานเป็น Excel (ExcelJS): รายเดือน/รายบริษัท ตาม filter ปัจจุบัน
-- [ ] รายงานย้อนหลัง: สรุปผลรายเดือน (จำนวนตาม risk/status) เทียบเดือนก่อนหน้า
-- [ ] Docker Compose production: build api + web (nginx) + db, ทดสอบ `docker compose up` จบในคำสั่งเดียว
-- [ ] README.md: วิธีติดตั้ง, ตั้งค่า .env, การใช้งานเบื้องต้น
-- [ ] ตรวจความปลอดภัยพื้นฐาน: rate limit login, validate file type/size ตอน upload, helmet, CORS
-- [ ] รัน test ทั้งหมด + ทดสอบ e2e flow สุดท้ายอีกรอบ
+- [x] Export รายงานเป็น Excel (ExcelJS): รายเดือน/รายบริษัท ตาม filter ปัจจุบัน
+      — `GET /reports/certificates.xlsx` ใช้ตัวกรองชุดเดียวกับหน้า Certificates (company/month/risk/status/search/expired)
+      — ไฟล์มี 2 sheet: **สรุป** (ขอบเขตที่กรอง + จำนวนตาม risk/status จาก DashboardService ชุดเดียวกับหน้าจอ)
+        และ **รายการ Certificate** (ข้อมูลเทคนิคครบ 16 คอลัมน์, วันหมดอายุเป็น พ.ศ., ป้ายสถานะภาษาไทย)
+      — มีเพดาน 5,000 แถวต่อไฟล์ · ถ้าถูกตัดจะเขียนกำกับในไฟล์และแจ้งบนหน้าจอ (ไม่ตัดเงียบๆ)
+- [x] รายงานย้อนหลัง: สรุปผลรายเดือน (จำนวนตาม risk/status) เทียบเดือนก่อนหน้า
+      — `GET /reports/monthly?month=&companyId=` คืนตัวเลขเดือนที่เลือก + เดือนก่อนหน้า + ส่วนต่าง
+      — หน้า Reports แสดงตารางเทียบ (เพิ่มขึ้น = ส้ม, ลดลง = เขียว) + ตารางสถานะงานของทั้งสองเดือน
+- [x] Docker Compose production: build api + web (nginx) + db, ทดสอบ `docker compose up` จบในคำสั่งเดียว
+      — `apps/api/Dockerfile` (multi-stage, รันด้วยผู้ใช้ `node`, tini เป็น PID 1, healthcheck)
+        entrypoint apply migration + seed (idempotent) ให้เองตอนสตาร์ท
+      — `apps/web/Dockerfile` build ด้วย `VITE_API_BASE_URL=/api` แล้วเสิร์ฟด้วย nginx
+        ที่ proxy `/api` ไป container api → หน้าเว็บกับ API เป็น same-origin
+      — เพิ่ม volume `uploads` ให้ไฟล์แนบอยู่รอดเมื่อสร้าง container ใหม่ · `.dockerignore` กัน .env หลุดเข้า image
+- [x] README.md: วิธีติดตั้ง, ตั้งค่า .env, การใช้งานเบื้องต้น
+      — เขียนใหม่ทั้งไฟล์: ความสามารถ, ติดตั้งด้วย Docker, การใช้งาน 7 ขั้น, เปิดแจ้งเตือนจริง,
+        การพัฒนาต่อ, ความปลอดภัย, ตารางแก้ปัญหาที่พบบ่อย
+- [x] ตรวจความปลอดภัยพื้นฐาน: rate limit login, validate file type/size ตอน upload, helmet, CORS
+      — **rate limit 2 ชั้น**: ต่อ (IP + อีเมล) ที่ api (`LOGIN_RATE_LIMIT`, ค่าเริ่มต้น 5 ครั้ง/นาที)
+        และต่อ IP ที่ nginx (`limit_req` 10r/m) · login สำเร็จแล้วล้างตัวนับ
+      — upload: ตรวจนามสกุล + mime + **ไบต์แรกของไฟล์** (`.xlsx` ต้องเป็น ZIP/OOXML) + ขนาด
+      — helmet + CORS allowlist + จำกัด JSON body 256kb + `trust proxy` · CSP ของหน้าเว็บอยู่ใน nginx
+      — เพิ่ม `env-check.ts`: ถ้า `JWT_SECRET` ยังเป็นค่าตัวอย่างหรือสั้นกว่า 32 ตัวอักษร **API จะไม่เริ่มทำงาน**
+- [x] รัน test ทั้งหมด + ทดสอบ e2e flow สุดท้ายอีกรอบ — ผ่าน 653/653
 
 **เกณฑ์ตรวจรับ:**
-- เครื่องใหม่ clone repo → ตั้ง .env → `docker compose up` → ใช้งานได้จริงตาม README
-- Export Excel เปิดได้ ข้อมูลตรงกับหน้าจอ
+- [x] เครื่องใหม่ clone repo → ตั้ง .env → `docker compose up` → ใช้งานได้จริงตาม README
+      — ทดสอบด้วย compose project แยก (`ct-fresh`) บน **volume เปล่า**: apply migration 2 ตัว →
+        seed สร้างบริษัท 2 แห่ง + บัญชี admin → login ผ่าน nginx → import ไฟล์จริงได้ 7 รายการ (สร้างงาน 7 งาน) →
+        dashboard `total=7 HIGH=1 MEDIUM=6` → ดาวน์โหลด Excel 7 แถว · ลบ stack ทดสอบทิ้งแล้ว
+- [x] Export Excel เปิดได้ ข้อมูลตรงกับหน้าจอ
+      — e2e เปิดไฟล์ที่ดาวน์โหลดด้วย ExcelJS แล้วตรวจว่ามี 2 sheet, จำนวนแถวตรงกับตัวกรอง (7 แถว
+        และ 1 แถวเมื่อกรอง `risk=HIGH`) พร้อมค่าที่อ่านได้จริง เช่น `smewormdc02.smebank.local`, `SHA256withRSA`
+
+> **สิ่งที่เจอจากการรัน Docker จริง (แก้แล้วทั้งสอง):**
+> 1. `prisma/seed.ts` import จาก `../src/...` ทำให้ seed รันใน image ไม่ได้ (image ไม่มีซอร์ส) →
+>    ย้ายโค้ด seed ไป `src/seed.ts` ให้ถูกคอมไพล์ลง `dist` แล้ว entrypoint รัน `node dist/seed.js`
+>    (`prisma/seed.ts` เหลือเป็นตัวห่อบางๆ ให้ `prisma db seed` ตอน dev)
+> 2. nginx **ไม่สืบทอด** `add_header` จากระดับ server เมื่อ location ประกาศ `add_header` เอง →
+>    security header หายไปจากหน้าเว็บทั้งหมด ทั้งที่ตั้งไว้ที่ server · แยกเป็น `security-headers.inc`
+>    แล้ว include ในทุก location ที่มี add_header ของตัวเอง
+>
+> **ปรับโครงสร้างระหว่างเฟสนี้:** ย้าย helmet/CORS/ValidationPipe จาก `main.ts` ไป `bootstrap.ts`
+> แล้วให้ e2e ทั้ง 6 ไฟล์เรียกใช้ชุดเดียวกัน — เดิมเทสต์ไม่ได้ผ่าน middleware เหล่านี้เลย
+> จึงทดสอบเรื่อง security header ไม่ได้ (และตอนนี้ e2e ครอบ helmet/CORS ของจริงแล้ว)
 
 ---
 
@@ -332,4 +367,5 @@
 | 2026-08-03 | Phase 4 | Certificate API (filter risk/month/status/search + pagination, risk คำนวณสด), Renewal workflow (transition guard + assign + ประวัติทุกขั้น), Attachment upload/download, `GET /dashboard/summary` (byRisk/byStatus/byRiskStatus) — test ผ่าน 388/388 (api unit 269 + api e2e 78 + shared 40 + web 1) | ✅ ผ่าน (commit `65c3749`) |
 | 2026-08-03 | Phase 5 | Notification Service: node-cron รายวัน (Asia/Bangkok), ขั้นบันได 90/60/30/≤7 ใน shared, adapter Email (nodemailer) + LINE (Messaging API) พร้อมโหมดซ้อม, idempotent ด้วย NotificationLog (upsert + ไม่นับแถวที่ล้มเหลว), ข้าม cert ที่งานเสร็จแล้ว, `POST /notifications/test-run` + `preview`, `GET /notifications`, ตัวช่วยวันที่ พ.ศ. ใน shared — test ผ่าน 469/469 (api unit 298 + api e2e 93 + shared 77 + web 1) | ✅ ผ่าน (commit `fc2f41c`) |
 | 2026-08-03 | Phase 6 | Frontend: design system จาก legacy (Sarabun + CSS variables + policy card/badge/ตาราง), layout sidebar + header, หน้า Login, หน้า Dashboard ครบ (การ์ด 4+5 ใบ, Doughnut + Grouped Bar สไตล์เดิม, ตัวกรองบริษัท/เดือน พ.ศ./สถานะ, ตารางพร้อมแบ่งหน้า, ปุ่มพิมพ์ + `@media print`), ข้อมูลทั้งหมดผ่าน React Query, เพิ่ม `status` ให้ `/dashboard/summary` — test ผ่าน 508/508 (api unit 300 + api e2e 95 + shared 77 + web 36) | ✅ ผ่าน (commit `8c2dd88`) |
-| 2026-08-03 | Phase 7 | Frontend ครบทุกหน้า: Companies (CRUD + soft delete), Import 3 ขั้นพร้อมรายละเอียด error, Certificates + filter/search, Certificate Detail (ข้อมูลเทคนิค + timeline + ไฟล์แนบ + จัดการงาน), Tasks board, Settings/Users · api เพิ่ม `GET /users` + `PATCH /users/:id` และย้ายตาราง transition ไป `packages/shared` — test ผ่าน 591/591 (api unit 313 + api e2e 120 + shared 86 + web 72) | รอตรวจ |
+| 2026-08-03 | Phase 7 | Frontend ครบทุกหน้า: Companies (CRUD + soft delete), Import 3 ขั้นพร้อมรายละเอียด error, Certificates + filter/search, Certificate Detail (ข้อมูลเทคนิค + timeline + ไฟล์แนบ + จัดการงาน), Tasks board, Settings/Users · api เพิ่ม `GET /users` + `PATCH /users/:id` และย้ายตาราง transition ไป `packages/shared` — test ผ่าน 591/591 (api unit 313 + api e2e 120 + shared 86 + web 72) | ✅ ผ่าน (commit `5cfaed3`) |
+| 2026-08-04 | Phase 8 | Reports (Export Excel 2 sheet ตามตัวกรอง + สรุปรายเดือนเทียบเดือนก่อน) · หน้า Reports · Docker Compose production (api multi-stage + nginx เสิร์ฟ SPA/proxy `/api` + volume uploads) · README ใหม่ทั้งไฟล์ · hardening (rate limit login 2 ชั้น, ตรวจไบต์แรกของไฟล์อัปโหลด, helmet/CORS/body limit, env-check ปฏิเสธ secret ค่าตัวอย่าง) · ย้าย middleware ไป `bootstrap.ts` ให้ e2e ใช้ชุดเดียวกับ production — test ผ่าน 653/653 (api unit 355 + api e2e 133 + shared 86 + web 79) | รอตรวจ |

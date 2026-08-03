@@ -7,12 +7,13 @@
  *
  * ต้องมี PostgreSQL รันอยู่ (`docker compose up -d db`)
  */
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { PrismaClient, UserRole, WorkStatus } from '@prisma/client';
 import { join } from 'node:path';
 import request, { type Test as SupertestRequest } from 'supertest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/bootstrap';
 import { hashPassword } from '../src/common/password';
 
 const FIXTURES = join(__dirname, 'fixtures');
@@ -30,7 +31,7 @@ const CODE_SWAP = `E2ESWP${RUN_ID}`.slice(0, 18);
 const EXPECTED_CERTS = 7;
 
 describe('Imports (e2e) — ไฟล์ Excel จริง', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let prisma: PrismaClient;
   let adminToken: string;
   let viewerToken: string;
@@ -66,10 +67,9 @@ describe('Imports (e2e) — ไฟล์ Excel จริง', () => {
     swapCompanyId = swap.id;
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-    );
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    // ใช้การตั้งค่าชุดเดียวกับ main.ts (helmet, CORS, ValidationPipe) เพื่อให้เทสต์ตรงกับของจริง
+    configureApp(app);
     await app.init();
 
     const login = async (email: string): Promise<string> => {

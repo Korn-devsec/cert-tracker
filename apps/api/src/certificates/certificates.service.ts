@@ -28,6 +28,9 @@ import {
 } from './certificates.types';
 import { ListCertificatesDto } from './dto/list-certificates.dto';
 
+/** เพดานจำนวนแถวต่อการ Export หนึ่งครั้ง (กันไฟล์ใหญ่เกินและ query ที่กินเวลานาน) */
+export const EXPORT_ROW_LIMIT = 5000;
+
 @Injectable()
 export class CertificatesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -73,6 +76,37 @@ export class CertificatesService {
     return {
       ...withRiskFields(certificate, now),
       currentTask: certificate.renewalTasks[0] ?? null,
+    };
+  }
+
+  /**
+   * ดึงทุกแถวที่ตรงตัวกรอง (ไม่แบ่งหน้า) สำหรับ Export Excel ใน Phase 8
+   *
+   * ใช้ตัวกรองชุดเดียวกับหน้าจอ (`buildWhere`) เพื่อให้ไฟล์ที่ได้ตรงกับที่ผู้ใช้เห็นจริง
+   * มีเพดานกันดึงทั้งฐานข้อมูลในคำขอเดียว และ**คืนค่ามาว่าถูกตัดหรือไม่** ไม่ตัดแบบเงียบๆ
+   */
+  async findAllForExport(
+    query: ListCertificatesDto,
+    limit = EXPORT_ROW_LIMIT,
+  ): Promise<{ rows: CertificateListItem[]; asOf: Date; truncated: boolean }> {
+    const now = new Date();
+    const where = await this.buildWhere(query, now);
+    const rows = await this.prisma.certificate.findMany({
+      where,
+      include: CERTIFICATE_LIST_INCLUDE,
+      orderBy: { [query.sortBy ?? 'expiresAt']: query.order ?? 'asc' },
+      // ขอเกินมา 1 แถวเพื่อรู้ว่ายังมีต่อหรือไม่
+      take: limit + 1,
+    });
+
+    const truncated = rows.length > limit;
+    return {
+      rows: rows.slice(0, limit).map(({ renewalTasks, ...certificate }) => ({
+        ...withRiskFields(certificate, now),
+        currentTask: renewalTasks[0] ?? null,
+      })),
+      asOf: now,
+      truncated,
     };
   }
 

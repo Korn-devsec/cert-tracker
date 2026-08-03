@@ -1,21 +1,20 @@
 import 'reflect-metadata';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { configureApp } from './bootstrap';
+import { assertProductionEnv } from './common/env-check';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // ตรวจค่าคอนฟิกสำคัญก่อนต่อ DB — ถ้ายังใช้ JWT secret ค่าตัวอย่างจะไม่ยอมเริ่มระบบ
+  assertProductionEnv();
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
 
-  const origins = (process.env.WEB_ORIGIN ?? 'http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  app.enableCors({ origin: origins, credentials: true });
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-  );
+  // helmet / CORS / ValidationPipe / trust proxy — ชุดเดียวกับที่เทสต์ e2e ใช้ (ดู bootstrap.ts)
+  configureApp(app);
   app.enableShutdownHooks();
 
   const port = Number(process.env.PORT ?? 3000);

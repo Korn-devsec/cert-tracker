@@ -16,6 +16,7 @@ import type {
   ImportInspectResult,
   ImportResult,
   LoginResponse,
+  MonthlyReport,
   Paginated,
   RenewalTask,
   TaskListItem,
@@ -292,7 +293,55 @@ export const api = {
     id: string,
     body: { name?: string; role?: string; isActive?: boolean; password?: string },
   ): Promise<UserAccount> => apiFetch(`/users/${id}`, { method: 'PATCH', body }),
+
+  // ===== รายงาน (หน้า Reports) =====
+  monthlyReport: (params: { companyId?: string; month?: string }): Promise<MonthlyReport> =>
+    apiFetch(`/reports/monthly${buildQuery(params)}`),
 };
+
+/**
+ * ดาวน์โหลดรายงาน Excel ตามตัวกรองปัจจุบัน
+ * ต้องดึงเป็น blob เพราะ endpoint ต้องมี Authorization header (แบบเดียวกับไฟล์แนบ)
+ * คืนจำนวนแถวและสถานะการตัดข้อมูลที่ api บอกมาใน header เพื่อแจ้งผู้ใช้ได้ตรงๆ
+ */
+export async function downloadCertificateReport(params: {
+  companyId?: string;
+  month?: string;
+  status?: string;
+  risk?: string;
+  search?: string;
+  expired?: string;
+}): Promise<{ rowCount: number; truncated: boolean; filename: string }> {
+  const token = readToken();
+  const response = await fetch(`${API_BASE_URL}/reports/certificates.xlsx${buildQuery(params)}`, {
+    headers: token === null ? {} : { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) {
+    onUnauthorized();
+  }
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  const filename =
+    /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ??
+    'ssl-certificates.xlsx';
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  return {
+    rowCount: Number(response.headers.get('X-Report-Row-Count') ?? 0),
+    truncated: response.headers.get('X-Report-Truncated') === 'true',
+    filename,
+  };
+}
 
 /**
  * ดาวน์โหลดไฟล์แนบพร้อมแนบ token — `<a href>` ธรรมดาแนบ Authorization header ไม่ได้
