@@ -4,7 +4,7 @@
 > ทำทีละเฟสตามลำดับ ติ๊ก `[x]` เมื่อเสร็จ และ**หยุดรอผู้ใช้ตรวจ**เมื่อจบแต่ละเฟส
 > ห้ามเริ่มเฟสถัดไปจนกว่าผู้ใช้จะพิมพ์ยืนยัน เช่น "ผ่าน เริ่มเฟสถัดไปได้"
 
-**สถานะปัจจุบัน:** Phase 0–2 ตรวจผ่านและ push แล้ว · Phase 3 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 4
+**สถานะปัจจุบัน:** Phase 0–3 ตรวจผ่านแล้ว · Phase 4 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 5
 
 ---
 
@@ -152,19 +152,46 @@
 
 ## Phase 4 — Certificate API, Risk & Renewal Workflow
 
-- [ ] `GET /certificates` พร้อม filter: company, month, risk, status + pagination + sort
-- [ ] `GET /certificates/:id` แสดง detail ครบ: CN, SAN, Issuer, Serial, Signature Algorithm, Key Size, SHA256, Endpoint, Owner + history + attachments
-- [ ] `daysUntilExpiry` และ `riskLevel` คำนวณสด ณ เวลา query (ไม่ freeze ค่าเก่าจาก Excel)
-- [ ] RenewalTask workflow API: เปลี่ยน status ได้เฉพาะ transition ที่ถูกต้อง
+- [x] `GET /certificates` พร้อม filter: company, month, risk, status + pagination + sort
+      — เพิ่ม `siteId`, `search` (CN/endpoint/owner/issuer), `expired`, `includeInactive`
+      — **ตัวกรอง risk/month/expired ถูกแปลงเป็นช่วงวันของ `expiresAt` แล้วกรองใน DB** ไม่ใช่กรองใน JS
+        (ถ้ากรองหลังแบ่งหน้า ตัวเลข total กับจำนวนหน้าจะโกหก) · response เป็น `{ data, meta }`
+        โดย `meta.asOf` บอกเวลาที่ใช้คำนวณความเสี่ยงของชุดข้อมูลนั้น
+- [x] `GET /certificates/:id` แสดง detail ครบ: CN, SAN, Issuer, Serial, Signature Algorithm, Key Size, SHA256, Endpoint, Owner + history + attachments
+      — พร้อม `currentTask` (task ล่าสุด) และ `renewalTasks` ทุกรอบ · history ส่ง 200 รายการล่าสุด
+- [x] `daysUntilExpiry` และ `riskLevel` คำนวณสด ณ เวลา query (ไม่ freeze ค่าเก่าจาก Excel)
+      — ผ่าน `common/risk-fields.ts` ที่เดียว (เพิ่ม `isExpired` ให้ด้วย) ใช้ `calculateRisk` จาก `packages/shared`
+- [x] RenewalTask workflow API: เปลี่ยน status ได้เฉพาะ transition ที่ถูกต้อง
       `New → Assigned → In Progress → Waiting Vendor ⇄ Waiting CA → Testing → Completed`, ยกเลิกได้ทุกขั้น → `Cancelled`
-- [ ] Assign ผู้รับผิดชอบ + ทุกการเปลี่ยน status ลง HistoryLog (actor, from→to, note)
-- [ ] Attachment upload/download ต่อ certificate
-- [ ] `GET /dashboard/summary?companyId=&month=` คืน counts: total, byRisk, byStatus, expiringSoon, expired
-- [ ] Unit test: transition ที่ผิด (เช่น New → Completed ข้ามขั้น) ต้องโดน 400
+      — `PATCH /tasks/:id/status`, `PATCH /tasks/:id/assign`, `POST /tasks`, `GET /tasks`, `GET /tasks/:id`
+      — เพิ่ม 2 เส้นทางจากสเปก: ข้ามไป Testing ได้ (cert ที่ออกเองไม่มี vendor/CA) และ Testing → In Progress
+        (ทดสอบไม่ผ่านต้องกลับไปแก้) · Completed/Cancelled เป็นปลายทาง เปลี่ยนต่อไม่ได้ → เปิดงานใบใหม่
+- [x] Assign ผู้รับผิดชอบ + ทุกการเปลี่ยน status ลง HistoryLog (actor, from→to, note)
+      — เขียนใน `$transaction` เดียวกับการอัปเดต · action ตามความหมายจริง
+        (`CONTACT_VENDOR` / `CSR_GENERATED` / `VERIFY` / `COMPLETE` / `CANCEL`) ไม่ใช่ `STATUS_CHANGE` ทุกบรรทัด
+      — มอบหมายงานที่ยังเป็น New → เดินเป็น Assigned อัตโนมัติ และลงประวัติ **แยกบรรทัด** ไม่ซ่อนในรายการมอบหมาย
+      — มอบหมายให้ viewer หรือบัญชีที่ปิดใช้งาน → 400
+- [x] Attachment upload/download ต่อ certificate
+      — `POST/GET /certificates/:id/attachments`, `GET .../:attachmentId/download`
+      — เก็บไฟล์ที่ `UPLOAD_DIR` ชื่อไฟล์บนดิสก์เป็น uuid (ชื่อจาก client ไม่มีผลต่อ path) + กัน path traversal
+      — ไม่รับไฟล์ที่มี private key (`.key/.pfx/.p12/.jks/.pk8`) → 400
+- [x] `GET /dashboard/summary?companyId=&month=` คืน counts: total, byRisk, byStatus, expiringSoon, expired
+      — เพิ่ม `byRiskStatus` (done/pending/cancelled ต่อระดับความเสี่ยง) สำหรับ Grouped Bar ของ Phase 6
+        และ `noTask`, `completed`, `pending`, `cancelled`, `asOf`
+- [x] Unit test: transition ที่ผิด (เช่น New → Completed ข้ามขั้น) ต้องโดน 400
+      — `transitions.spec.ts` คุมตารางทั้ง 8×8 + `tasks.service.spec.ts` ยืนยันว่า 400 แล้วไม่แตะ DB/ประวัติ
 
 **เกณฑ์ตรวจรับ:**
-- Cert เหลือ 20 วัน + task Completed แสดง Risk=High และ Status=Completed พร้อมกันได้ (พิสูจน์ว่าแยกกันจริง)
-- ประวัติการเปลี่ยน status ย้อนดูได้ครบว่าใครทำอะไรเมื่อไร
+- [x] Cert เหลือ 20 วัน + task Completed แสดง Risk=High และ Status=Completed พร้อมกันได้ (พิสูจน์ว่าแยกกันจริง)
+      — e2e เดินงานจริงจนปิด แล้วอ่าน `GET /certificates/:id` ได้ `riskLevel: HIGH` + `currentTask.status: COMPLETED`
+- [x] ประวัติการเปลี่ยน status ย้อนดูได้ครบว่าใครทำอะไรเมื่อไร
+      — `GET /tasks/:id` คืน 8 บรรทัดครบทั้งเส้นทาง ทุกบรรทัดมี actor/createdAt และ metadata `from`→`to`
+
+> **บั๊กที่เจอจาก e2e ในเฟสนี้ (สองเรื่องที่ unit test จับไม่ได้):**
+> 1. `$queryRaw` ที่ cast พารามิเตอร์เป็น `::uuid` พังทั้งหมด (`operator does not exist: text = uuid`)
+>    เพราะคอลัมน์ id ที่ Prisma สร้างเป็น `text` ไม่ใช่ `uuid` → ตัด cast ออก
+> 2. ชื่อไฟล์แนบภาษาไทยเข้า DB เป็นตัวขยะ — busboy (ที่ multer ใช้) ถอดส่วนหัว `filename` เป็น latin1
+>    → เพิ่ม `decodeUploadFilename()` แปลงกลับเป็น UTF-8 ที่ขอบทางเข้า (คงค่าเดิมถ้าไม่เข้าเงื่อนไข)
 
 ---
 
@@ -244,4 +271,5 @@
 | 2026-08-03 | Phase 0 | วาง monorepo (npm workspaces) + docker-compose (PostgreSQL 16) + NestJS 11/Prisma 6 + Vite 6/React 18 + packages/shared (enums+label ไทย) + ESLint/Prettier + git init — `GET /health` ตอบ `{status:"ok",db:"connected"}`, test ผ่าน 9/9 | ✅ ผ่าน (commit `4e6bef2`) |
 | 2026-08-03 | Phase 1 | Prisma schema 9 model + 6 enum, migration `init`, seed (2 บริษัท + admin, idempotent), `calculateRisk`/`calculateDaysUntilExpiry`/`isExpired` ใน packages/shared, password util (scrypt), enum parity test — test ผ่าน 50/50 | ✅ ผ่าน (commit `ca5dd4d`) |
 | 2026-08-03 | Phase 2 | JWT auth + RBAC (global guard, ปิดทุก endpoint เป็นค่าเริ่มต้น), Company CRUD + soft delete, Site CRUD, HistoryService เขียนประวัติใน transaction เดียวกับ mutation — test ผ่าน 97/97 (unit 78 + e2e 19) | ✅ ผ่าน (commit `3f154f0`) |
-| 2026-08-03 | Phase 3 | Excel Import Service: sheet/header auto-detect, header mapping (+typo `Onwer`), status ไทย (+trailing space), split endpoint หลายค่า, strict validation, upsert, ImportBatch + HistoryLog + RenewalTask อัตโนมัติ, `dryRun` preview — test ผ่าน 212/212 (unit 172 + e2e 40) | รอตรวจ |
+| 2026-08-03 | Phase 3 | Excel Import Service: sheet/header auto-detect, header mapping (+typo `Onwer`), status ไทย (+trailing space), split endpoint หลายค่า, strict validation, upsert, ImportBatch + HistoryLog + RenewalTask อัตโนมัติ, `dryRun` preview — test ผ่าน 212/212 (unit 172 + e2e 40) | ✅ ผ่าน (commit `3866d77`) |
+| 2026-08-03 | Phase 4 | Certificate API (filter risk/month/status/search + pagination, risk คำนวณสด), Renewal workflow (transition guard + assign + ประวัติทุกขั้น), Attachment upload/download, `GET /dashboard/summary` (byRisk/byStatus/byRiskStatus) — test ผ่าน 388/388 (api unit 269 + api e2e 78 + shared 40 + web 1) | รอตรวจ |

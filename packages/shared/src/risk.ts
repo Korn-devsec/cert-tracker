@@ -69,3 +69,70 @@ export function isExpired(daysUntilExpiry: number): boolean {
 export function calculateRiskFromExpiry(expiresAt: Date, now?: Date): RiskLevel {
   return calculateRisk(calculateDaysUntilExpiry(expiresAt, now));
 }
+
+/** เที่ยงคืนของวันนั้นบนฐาน UTC — จุดอ้างอิงเดียวกับ calculateDaysUntilExpiry */
+export function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function addUtcDays(base: Date, days: number): Date {
+  return new Date(base.getTime() + days * MS_PER_DAY);
+}
+
+/**
+ * ช่วงของ `expiresAt` แบบครึ่งเปิด `[gte, lt)` — `null` = ไม่จำกัดด้านนั้น
+ * ใช้แปลงเงื่อนไข "จำนวนวันคงเหลือ" ให้เป็นเงื่อนไขวันที่ที่ query ใน DB ได้ตรงๆ
+ */
+export interface ExpiryWindow {
+  gte: Date | null;
+  lt: Date | null;
+}
+
+/**
+ * แปลงช่วง "จำนวนวันคงเหลือ" เป็นช่วงวันหมดอายุ
+ *
+ * เพราะ `daysUntilExpiry` เป็นฟังก์ชันที่ลดลงตาม `expiresAt` แบบต่อเนื่อง
+ * เงื่อนไขจำนวนวันจึงเทียบเท่าเงื่อนไขวันที่ได้เสมอ — ทำให้กรองและแบ่งหน้า (pagination)
+ * ในฐานข้อมูลได้ถูกต้อง ไม่ต้องดึงทุกแถวมากรองในหน่วยความจำ
+ *
+ * @param minDays จำนวนวันคงเหลือน้อยสุดที่ต้องการ (null = ไม่จำกัด เช่นรวม cert ที่หมดอายุแล้ว)
+ * @param maxDays จำนวนวันคงเหลือมากสุดที่ต้องการ (null = ไม่จำกัด)
+ */
+export function expiryWindowForDayRange(
+  minDays: number | null,
+  maxDays: number | null,
+  now: Date = new Date(),
+): ExpiryWindow {
+  const base = startOfUtcDay(now);
+  return {
+    gte: minDays === null ? null : addUtcDays(base, minDays),
+    // +1 วันเพราะขอบขวาเป็นแบบเปิด: "เหลือไม่เกิน 30 วัน" = ก่อนเที่ยงคืนของวันที่ 31
+    lt: maxDays === null ? null : addUtcDays(base, maxDays + 1),
+  };
+}
+
+/** ช่วงวันหมดอายุของแต่ละระดับความเสี่ยง — คู่ตรงข้ามของ calculateRisk() */
+export function riskExpiryWindow(risk: RiskLevel, now: Date = new Date()): ExpiryWindow {
+  const { HIGH_MAX_DAYS, MEDIUM_MAX_DAYS, LOW_MAX_DAYS } = RISK_DAY_THRESHOLDS;
+  switch (risk) {
+    // HIGH รวม cert ที่หมดอายุแล้ว (วันคงเหลือติดลบ) จึงไม่มีขอบซ้าย
+    case RiskLevel.HIGH:
+      return expiryWindowForDayRange(null, HIGH_MAX_DAYS, now);
+    case RiskLevel.MEDIUM:
+      return expiryWindowForDayRange(HIGH_MAX_DAYS + 1, MEDIUM_MAX_DAYS, now);
+    case RiskLevel.LOW:
+      return expiryWindowForDayRange(MEDIUM_MAX_DAYS + 1, LOW_MAX_DAYS, now);
+    case RiskLevel.SAFE:
+      return expiryWindowForDayRange(LOW_MAX_DAYS + 1, null, now);
+  }
+}
+
+/** ช่วงของ cert ที่หมดอายุแล้ว (วันคงเหลือ < 0) */
+export function expiredExpiryWindow(now: Date = new Date()): ExpiryWindow {
+  return { gte: null, lt: startOfUtcDay(now) };
+}
+
+/** ช่วงของ cert ที่ใกล้หมดอายุแต่ยังไม่หมด (0–30 วัน) — ตัวเลข "Expiring Soon" บน Dashboard */
+export function expiringSoonExpiryWindow(now: Date = new Date()): ExpiryWindow {
+  return expiryWindowForDayRange(0, RISK_DAY_THRESHOLDS.HIGH_MAX_DAYS, now);
+}

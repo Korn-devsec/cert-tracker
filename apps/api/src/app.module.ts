@@ -4,11 +4,14 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { CertificatesModule } from './certificates/certificates.module';
 import { CompaniesModule } from './companies/companies.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { HistoryModule } from './history/history.module';
 import { ImportsModule } from './imports/imports.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -19,6 +22,9 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     CompaniesModule,
     ImportsModule,
+    CertificatesModule,
+    TasksModule,
+    DashboardModule,
     HealthModule,
   ],
   providers: [

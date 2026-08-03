@@ -27,16 +27,8 @@ import {
 } from './excel/row-parser';
 import { findHeaderRow, inspectWorkbook, readRowValues } from './excel/sheet-inspector';
 import type { ImportPreviewRow, ImportResult, InspectResult } from './imports.types';
-
-/** สถานะที่ถือว่างานยังค้างอยู่ — ใช้เช็คก่อนสร้าง RenewalTask ใหม่ */
-const OPEN_TASK_STATUSES: WorkStatus[] = [
-  WorkStatus.NEW,
-  WorkStatus.ASSIGNED,
-  WorkStatus.IN_PROGRESS,
-  WorkStatus.WAITING_VENDOR,
-  WorkStatus.WAITING_CA,
-  WorkStatus.TESTING,
-];
+// นิยาม "งานที่ยังค้าง" อยู่ที่เดียวกับกฎ workflow (Phase 4) เพื่อไม่ให้สองที่หลุดจากกัน
+import { OPEN_TASK_STATUSES } from '../tasks/transitions';
 
 const MAX_PREVIEW_ROWS = 100;
 

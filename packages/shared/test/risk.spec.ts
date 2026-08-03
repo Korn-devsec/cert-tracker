@@ -4,7 +4,12 @@ import {
   calculateDaysUntilExpiry,
   calculateRisk,
   calculateRiskFromExpiry,
+  expiredExpiryWindow,
+  expiringSoonExpiryWindow,
+  expiryWindowForDayRange,
   isExpired,
+  riskExpiryWindow,
+  startOfUtcDay,
 } from '../src';
 
 describe('calculateRisk — ขอบเขตตาม CLAUDE.md (<30 High / 31–60 Medium / 61–90 Low / >90 Safe)', () => {
@@ -97,5 +102,96 @@ describe('calculateRiskFromExpiry', () => {
 
   it('เหลือ 100 วัน → SAFE', () => {
     expect(calculateRiskFromExpiry(new Date('2026-11-11T00:00:00.000Z'), now)).toBe(RiskLevel.SAFE);
+  });
+});
+
+describe('startOfUtcDay', () => {
+  it('ตัดเวลาในวันออกบนฐาน UTC', () => {
+    expect(startOfUtcDay(new Date('2026-08-03T23:59:59.999Z')).toISOString()).toBe(
+      '2026-08-03T00:00:00.000Z',
+    );
+  });
+});
+
+describe('expiryWindowForDayRange', () => {
+  const now = new Date('2026-08-03T10:30:00.000Z');
+
+  it('ขอบซ้ายปิด ขอบขวาเปิด (บวก 1 วัน) — "ไม่เกิน 30 วัน" = ก่อนเที่ยงคืนวันที่ 31', () => {
+    const window = expiryWindowForDayRange(0, 30, now);
+    expect(window.gte?.toISOString()).toBe('2026-08-03T00:00:00.000Z');
+    expect(window.lt?.toISOString()).toBe('2026-09-03T00:00:00.000Z');
+  });
+
+  it('null = ไม่จำกัดด้านนั้น', () => {
+    expect(expiryWindowForDayRange(null, 30, now).gte).toBeNull();
+    expect(expiryWindowForDayRange(31, null, now).lt).toBeNull();
+  });
+});
+
+/**
+ * เทสต์ชุดนี้คุมสัญญาที่ Phase 4 ใช้กรอง cert ในฐานข้อมูล:
+ * ถ้า riskExpiryWindow() กับ calculateRisk() ไม่ตรงกัน ตัวเลขบน Dashboard จะเพี้ยนแบบเงียบๆ
+ */
+describe('riskExpiryWindow — ต้องเป็นคู่ตรงข้ามของ calculateRisk เสมอ', () => {
+  const now = new Date('2026-08-03T10:30:00.000Z');
+
+  it.each([RiskLevel.HIGH, RiskLevel.MEDIUM, RiskLevel.LOW, RiskLevel.SAFE])(
+    '%s: วันหมดอายุที่ตกในช่วงต้อง/ปลายช่วงให้ผลเป็นระดับเดิม',
+    (risk) => {
+      const { gte, lt } = riskExpiryWindow(risk, now);
+
+      if (gte !== null) {
+        expect(calculateRiskFromExpiry(gte, now)).toBe(risk);
+        // ก่อนขอบซ้าย 1 มิลลิวินาที = อยู่ในระดับที่เสี่ยงกว่า
+        expect(calculateRiskFromExpiry(new Date(gte.getTime() - 1), now)).not.toBe(risk);
+      }
+      if (lt !== null) {
+        expect(calculateRiskFromExpiry(new Date(lt.getTime() - 1), now)).toBe(risk);
+        // ขอบขวาเป็นแบบเปิด: ค่าที่ขอบพอดีต้องเป็นระดับถัดไปแล้ว
+        expect(calculateRiskFromExpiry(lt, now)).not.toBe(risk);
+      }
+    },
+  );
+
+  it('4 ช่วงต่อกันสนิทไม่ทับกัน (HIGH → MEDIUM → LOW → SAFE)', () => {
+    const high = riskExpiryWindow(RiskLevel.HIGH, now);
+    const medium = riskExpiryWindow(RiskLevel.MEDIUM, now);
+    const low = riskExpiryWindow(RiskLevel.LOW, now);
+    const safe = riskExpiryWindow(RiskLevel.SAFE, now);
+
+    expect(high.gte).toBeNull();
+    expect(high.lt?.toISOString()).toBe(medium.gte?.toISOString());
+    expect(medium.lt?.toISOString()).toBe(low.gte?.toISOString());
+    expect(low.lt?.toISOString()).toBe(safe.gte?.toISOString());
+    expect(safe.lt).toBeNull();
+  });
+
+  it('HIGH ครอบ cert ที่หมดอายุแล้วด้วย (ไม่มีขอบซ้าย)', () => {
+    const expiredLongAgo = new Date('2020-01-01T00:00:00.000Z');
+    expect(calculateRiskFromExpiry(expiredLongAgo, now)).toBe(RiskLevel.HIGH);
+    expect(riskExpiryWindow(RiskLevel.HIGH, now).gte).toBeNull();
+  });
+});
+
+describe('expiredExpiryWindow / expiringSoonExpiryWindow', () => {
+  const now = new Date('2026-08-03T10:30:00.000Z');
+
+  it('หมดอายุแล้ว = ก่อนเที่ยงคืนของวันนี้ (วันหมดอายุ = วันนี้ ยังไม่นับ)', () => {
+    const { gte, lt } = expiredExpiryWindow(now);
+    expect(gte).toBeNull();
+    expect(lt?.toISOString()).toBe('2026-08-03T00:00:00.000Z');
+    expect(isExpired(calculateDaysUntilExpiry(new Date('2026-08-02T23:59:59.999Z'), now))).toBe(
+      true,
+    );
+    expect(isExpired(calculateDaysUntilExpiry(new Date('2026-08-03T00:00:00.000Z'), now))).toBe(
+      false,
+    );
+  });
+
+  it('ใกล้หมดอายุ = 0–30 วัน และยังไม่หมดอายุ', () => {
+    const { gte, lt } = expiringSoonExpiryWindow(now);
+    expect(gte?.toISOString()).toBe('2026-08-03T00:00:00.000Z');
+    expect(lt?.toISOString()).toBe('2026-09-03T00:00:00.000Z');
+    expect(calculateDaysUntilExpiry(new Date('2026-09-02T23:59:59.999Z'), now)).toBe(30);
   });
 });
