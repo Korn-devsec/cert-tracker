@@ -4,7 +4,7 @@
 > ทำทีละเฟสตามลำดับ ติ๊ก `[x]` เมื่อเสร็จ และ**หยุดรอผู้ใช้ตรวจ**เมื่อจบแต่ละเฟส
 > ห้ามเริ่มเฟสถัดไปจนกว่าผู้ใช้จะพิมพ์ยืนยัน เช่น "ผ่าน เริ่มเฟสถัดไปได้"
 
-**สถานะปัจจุบัน:** Phase 0–3 ตรวจผ่านแล้ว · Phase 4 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 5
+**สถานะปัจจุบัน:** Phase 0–4 ตรวจผ่านและ push แล้ว · Phase 5 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 6
 
 ---
 
@@ -197,17 +197,38 @@
 
 ## Phase 5 — Notification Service
 
-- [ ] node-cron รันทุกวัน (เช่น 08:00) สแกน cert ทั้งหมดที่ active
-- [ ] กติกา tier: 90 วัน → Email | 60 วัน → Email + LINE | 30 วัน → Critical (Email+LINE ระดับด่วน) | ≤7 วัน → แจ้งทุกวัน
-- [ ] Idempotent: เช็ค `NotificationLog` ก่อนส่ง — tier เดิมของ cert เดิมส่งแล้ว ห้ามส่งซ้ำ (ยกเว้น tier ≤7 วันที่ส่งวันละครั้ง)
-- [ ] Channel เป็น interface/adapter: `EmailChannel` (nodemailer + SMTP จาก .env), `LineChannel` (LINE Messaging API) — dev mode ใช้ console/mock ได้
-- [ ] Cert ที่ RenewalTask = Completed แล้ว → ไม่ต้องแจ้งเตือนต่อ
-- [ ] Endpoint `POST /notifications/test-run` (admin) สำหรับ trigger ทดสอบโดยไม่ต้องรอ cron
-- [ ] Unit test: เลือก tier ถูกต้องตามจำนวนวัน, กันส่งซ้ำ, ข้าม cert ที่ Completed
+- [x] node-cron รันทุกวัน (เช่น 08:00) สแกน cert ทั้งหมดที่ active
+      — `NotificationScheduler` (node-cron 4) ตั้งเวลาจาก `NOTIFICATION_CRON` (ค่าเริ่มต้น `0 8 * * *`)
+        โซนเวลา `NOTIFICATION_TIMEZONE` (ค่าเริ่มต้น Asia/Bangkok) · `noOverlap` กันงานทับกัน
+      — cron ผิดรูปแบบ → log error แล้วข้ามการตั้งเวลา ไม่ทำให้ API ขึ้นไม่ได้ · ปิดได้ด้วย
+        `NOTIFICATION_CRON_ENABLED=false` และปิดอัตโนมัติเมื่อ `NODE_ENV=test` (ไม่ให้ cron แอบรันตอนเทสต์)
+      — สแกนเฉพาะ cert ที่ `isActive` **และบริษัทยัง `isActive`** ที่เหลือไม่เกิน 90 วัน (รวมที่หมดอายุแล้ว)
+- [x] กติกา tier: 90 วัน → Email | 60 วัน → Email + LINE | 30 วัน → Critical (Email+LINE ระดับด่วน) | ≤7 วัน → แจ้งทุกวัน
+      — กติกาอยู่ใน `packages/shared/src/notification.ts` ที่เดียว (`selectNotificationTier`,
+        `NOTIFICATION_TIER_CHANNELS`) · cert ที่หมดอายุแล้วเข้าขั้น ≤7 วัน = แจ้งต่อทุกวัน
+- [x] Idempotent: เช็ค `NotificationLog` ก่อนส่ง — tier เดิมของ cert เดิมส่งแล้ว ห้ามส่งซ้ำ (ยกเว้น tier ≤7 วันที่ส่งวันละครั้ง)
+      — โหลดประวัติที่ **ส่งสำเร็จ** ของ cert ทั้งชุดมาครั้งเดียวแล้วตัดสินในหน่วยความจำ
+      — แถวที่ล้มเหลว (`isSuccess=false`) **ไม่นับว่าเคยส่ง** → SMTP ล่มวันเดียวไม่ทำให้ใบนั้นเงียบตลอด
+      — บันทึกด้วย `upsert` บน unique key `(certificateId, tier, channel, sentOn)` ให้ DB เป็นคนกันซ้ำจริง
+- [x] Channel เป็น interface/adapter: `EmailChannel` (nodemailer + SMTP จาก .env), `LineChannel` (LINE Messaging API) — dev mode ใช้ console/mock ได้
+      — `NotificationChannelAdapter` (resolveRecipient + send) · เพิ่มช่องทางใหม่แก้ที่ module เดียว
+      — ไม่ได้ตั้งค่า SMTP/LINE หรือ `NOTIFICATION_DRY_RUN=true` → เขียนลง log แทน และรายงาน `mode: "console"`
+        กลับมาในผลการรัน (ไม่ให้เข้าใจผิดว่าส่งจริงแล้ว)
+      — ผู้รับอีเมล = `Company.contactEmail` (สำรองด้วย `MAIL_TO_FALLBACK`) · LINE ใช้ `LINE_TO`
+- [x] Cert ที่ RenewalTask = Completed แล้ว → ไม่ต้องแจ้งเตือนต่อ (ดูจาก task **ล่าสุด** ตามนิยาม Phase 4)
+- [x] Endpoint `POST /notifications/test-run` (admin) สำหรับ trigger ทดสอบโดยไม่ต้องรอ cron
+      — รับ `companyId` (จำกัดขอบเขต) และ `preview` (ดูว่าจะแจ้งใครบ้างโดยไม่ส่งและไม่บันทึก)
+      — เพิ่ม `GET /notifications` (ทุก role) ดูประวัติการแจ้งเตือน + filter tier/channel/isSuccess
+- [x] Unit test: เลือก tier ถูกต้องตามจำนวนวัน, กันส่งซ้ำ, ข้าม cert ที่ Completed
+      — shared: ขอบเขต 7/8, 30/31, 60/61, 90/91, 0, ค่าติดลบ + ช่องทางของทุกขั้น
+      — api: ขั้น/ช่องทางที่ส่งจริง, กันซ้ำทั้ง 2 แบบ, ข้าม Completed, ไม่มีปลายทาง, ช่องทางล้มเหลว, preview
 
 **เกณฑ์ตรวจรับ:**
-- รัน test-run กับ seed data แล้ว log แสดงการส่งถูก tier ถูก channel
-- รันซ้ำทันที → ไม่ส่งซ้ำ
+- [x] รัน test-run กับ seed data แล้ว log แสดงการส่งถูก tier ถูก channel
+      — ข้อมูลที่ import จริง (SMEBANK 7 ใบ): `sent: 14` = ขั้น 30 วัน 1 ใบ + ขั้น 60 วัน 6 ใบ × 2 ช่องทาง
+        (`byTier: {DAY_60: 6, DAY_30: 1}`, `byChannel: {EMAIL: 7, LINE: 7}`) ตรงกับวันหมดอายุในไฟล์
+- [x] รันซ้ำทันที → ไม่ส่งซ้ำ — `sent: 0, skippedAlreadySent: 14` และจำนวนแถวใน `NotificationLog` ไม่เพิ่ม
+      (e2e ยังทดสอบต่อว่า **วันถัดไป** ขั้น ≤7 วันแจ้งอีกครั้ง ส่วนขั้น 90/60/30 ยังเงียบ)
 
 ---
 
@@ -272,4 +293,5 @@
 | 2026-08-03 | Phase 1 | Prisma schema 9 model + 6 enum, migration `init`, seed (2 บริษัท + admin, idempotent), `calculateRisk`/`calculateDaysUntilExpiry`/`isExpired` ใน packages/shared, password util (scrypt), enum parity test — test ผ่าน 50/50 | ✅ ผ่าน (commit `ca5dd4d`) |
 | 2026-08-03 | Phase 2 | JWT auth + RBAC (global guard, ปิดทุก endpoint เป็นค่าเริ่มต้น), Company CRUD + soft delete, Site CRUD, HistoryService เขียนประวัติใน transaction เดียวกับ mutation — test ผ่าน 97/97 (unit 78 + e2e 19) | ✅ ผ่าน (commit `3f154f0`) |
 | 2026-08-03 | Phase 3 | Excel Import Service: sheet/header auto-detect, header mapping (+typo `Onwer`), status ไทย (+trailing space), split endpoint หลายค่า, strict validation, upsert, ImportBatch + HistoryLog + RenewalTask อัตโนมัติ, `dryRun` preview — test ผ่าน 212/212 (unit 172 + e2e 40) | ✅ ผ่าน (commit `3866d77`) |
-| 2026-08-03 | Phase 4 | Certificate API (filter risk/month/status/search + pagination, risk คำนวณสด), Renewal workflow (transition guard + assign + ประวัติทุกขั้น), Attachment upload/download, `GET /dashboard/summary` (byRisk/byStatus/byRiskStatus) — test ผ่าน 388/388 (api unit 269 + api e2e 78 + shared 40 + web 1) | รอตรวจ |
+| 2026-08-03 | Phase 4 | Certificate API (filter risk/month/status/search + pagination, risk คำนวณสด), Renewal workflow (transition guard + assign + ประวัติทุกขั้น), Attachment upload/download, `GET /dashboard/summary` (byRisk/byStatus/byRiskStatus) — test ผ่าน 388/388 (api unit 269 + api e2e 78 + shared 40 + web 1) | ✅ ผ่าน (commit `65c3749`) |
+| 2026-08-03 | Phase 5 | Notification Service: node-cron รายวัน (Asia/Bangkok), ขั้นบันได 90/60/30/≤7 ใน shared, adapter Email (nodemailer) + LINE (Messaging API) พร้อมโหมดซ้อม, idempotent ด้วย NotificationLog (upsert + ไม่นับแถวที่ล้มเหลว), ข้าม cert ที่งานเสร็จแล้ว, `POST /notifications/test-run` + `preview`, `GET /notifications`, ตัวช่วยวันที่ พ.ศ. ใน shared — test ผ่าน 469/469 (api unit 298 + api e2e 93 + shared 77 + web 1) | รอตรวจ |

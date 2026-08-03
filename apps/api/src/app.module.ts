@@ -10,6 +10,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { HistoryModule } from './history/history.module';
 import { ImportsModule } from './imports/imports.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TasksModule } from './tasks/tasks.module';
 
@@ -25,6 +26,7 @@ import { TasksModule } from './tasks/tasks.module';
     CertificatesModule,
     TasksModule,
     DashboardModule,
+    NotificationsModule,
     HealthModule,
   ],
   providers: [
