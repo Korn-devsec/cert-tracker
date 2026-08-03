@@ -4,7 +4,7 @@
 > ทำทีละเฟสตามลำดับ ติ๊ก `[x]` เมื่อเสร็จ และ**หยุดรอผู้ใช้ตรวจ**เมื่อจบแต่ละเฟส
 > ห้ามเริ่มเฟสถัดไปจนกว่าผู้ใช้จะพิมพ์ยืนยัน เช่น "ผ่าน เริ่มเฟสถัดไปได้"
 
-**สถานะปัจจุบัน:** Phase 0 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 1
+**สถานะปัจจุบัน:** Phase 0 ตรวจผ่านและ commit แล้ว · Phase 1 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 2
 
 ---
 
@@ -23,7 +23,7 @@
 - [x] `.env.example` ทั้ง api และ web (+ ที่ root สำหรับ docker compose)
 - [x] ESLint + Prettier ทั้งสองฝั่ง — ESLint 9 flat config ทั้ง 3 workspace, Prettier config ที่ root
 - [x] Git init + `.gitignore` (+ `.gitattributes` บังคับ LF)
-- [ ] **commit แรก — ยังไม่ commit** (stage ไว้ครบแล้ว) รอผู้ใช้ตรวจผ่านตาม Workflow ข้อ 4 ใน CLAUDE.md
+- [x] commit แรก — `4e6bef2` + `48c1b7e` (แก้ tsconfig ที่ deprecated ใน TS 7)
 
 **เกณฑ์ตรวจรับ:**
 - [x] `docker compose up -d db` แล้ว DB ขึ้น healthy — `docker inspect` คืนค่า `healthy`
@@ -34,16 +34,25 @@
 
 ## Phase 1 — Database Schema & Migration
 
-- [ ] เขียน Prisma schema ครบ: `Company`, `Site`, `Certificate`, `RenewalTask`, `HistoryLog`, `Attachment`, `NotificationLog`, `ImportBatch`, `User` ตาม Data Model ใน CLAUDE.md
-- [ ] ความสัมพันธ์: Company 1-n Site, Company 1-n Certificate, Certificate 1-n RenewalTask/HistoryLog/Attachment/NotificationLog
-- [ ] Index ที่จำเป็น: `certificate(companyId, expiresAt)`, `historyLog(certificateId, createdAt)`
-- [ ] Migration แรก + seed script: 2 บริษัทตัวอย่าง + admin user
-- [ ] Unit test: ฟังก์ชัน `calculateRisk(daysUntilExpiry)` ใน `packages/shared`
-      ทดสอบขอบเขต: 29→High, 30→High, 31→Medium, 60→Medium, 61→Low, 90→Low, 91→Safe, ค่าติดลบ→High/Expired
+- [x] เขียน Prisma schema ครบ: `Company`, `Site`, `Certificate`, `RenewalTask`, `HistoryLog`, `Attachment`, `NotificationLog`, `ImportBatch`, `User` ตาม Data Model ใน CLAUDE.md
+      — enum ใน DB 6 ตัว (`UserRole`, `WorkStatus`, `HistoryAction`, `NotificationTier`, `NotificationChannel`, `ImportStatus`)
+      — **ไม่เก็บ** `daysUntilExpiry`/`riskLevel` เป็นคอลัมน์ (คำนวณตอน query ตาม CLAUDE.md)
+- [x] ความสัมพันธ์: Company 1-n Site, Company 1-n Certificate, Certificate 1-n RenewalTask/HistoryLog/Attachment/NotificationLog
+      — `HistoryLog.certificateId` เป็น optional เพิ่ม `companyId`/`renewalTaskId` เพื่อรองรับ action ระดับระบบใน Phase 2
+- [x] Index ที่จำเป็น: `certificate(companyId, expiresAt)`, `historyLog(certificateId, createdAt)`
+      — เพิ่ม unique `certificate(companyId, commonName, endpoint)` (คีย์ upsert ของ Phase 3)
+      และ unique `notificationLog(certificateId, tier, channel, sentOn)` (กันแจ้งเตือนซ้ำใน Phase 5)
+- [x] Migration แรก + seed script: 2 บริษัทตัวอย่าง + admin user
+      — migration `20260803092629_init`, seed รันซ้ำได้ (idempotent) และไม่เขียนรหัสผ่านทับ
+      — hash รหัสผ่านด้วย scrypt (`src/common/password.ts`) ไม่เพิ่ม dependency ใหม่ (ดู DECISIONS.md — ขอยืนยันตอน Phase 2)
+- [x] Unit test: ฟังก์ชัน `calculateRisk(daysUntilExpiry)` ใน `packages/shared`
+      ทดสอบขอบเขต: 29→High, 30→High, 31→Medium, 60→Medium, 61→Low, 90→Low, 91→Safe, ค่าติดลบ→High
+      — ค่าติดลบให้ `HIGH` และแยกด้วย `isExpired()` (ไม่เพิ่มค่า `EXPIRED` — ดู DECISIONS.md)
+      — เพิ่ม test: `calculateDaysUntilExpiry` (วันปฏิทิน UTC), password hash, และ **enum parity** ระหว่าง Prisma กับ `packages/shared`
 
 **เกณฑ์ตรวจรับ:**
-- `npx prisma migrate dev` ผ่าน, เปิด `prisma studio` เห็นทุกตารางและ seed data
-- test risk calculation ผ่านทุก case
+- [x] `npx prisma migrate dev` ผ่าน — สร้างครบ 9 ตาราง + seed data (2 companies, 1 admin) เปิด `prisma studio` ดูได้
+- [x] test risk calculation ผ่านทุก case — รวมทั้งระบบ 50 tests ผ่านหมด (shared 29 / api 20 / web 1)
 
 ---
 
@@ -194,4 +203,5 @@
 
 | วันที่ | เฟส | สรุป | ผู้ตรวจยืนยัน |
 |---|---|---|---|
-| 2026-08-03 | Phase 0 | วาง monorepo (npm workspaces) + docker-compose (PostgreSQL 16) + NestJS 11/Prisma 6 + Vite 6/React 18 + packages/shared (enums+label ไทย) + ESLint/Prettier + git init — `GET /health` ตอบ `{status:"ok",db:"connected"}`, test ผ่าน 9/9 | รอตรวจ |
+| 2026-08-03 | Phase 0 | วาง monorepo (npm workspaces) + docker-compose (PostgreSQL 16) + NestJS 11/Prisma 6 + Vite 6/React 18 + packages/shared (enums+label ไทย) + ESLint/Prettier + git init — `GET /health` ตอบ `{status:"ok",db:"connected"}`, test ผ่าน 9/9 | ✅ ผ่าน (commit `4e6bef2`) |
+| 2026-08-03 | Phase 1 | Prisma schema 9 model + 6 enum, migration `init`, seed (2 บริษัท + admin, idempotent), `calculateRisk`/`calculateDaysUntilExpiry`/`isExpired` ใน packages/shared, password util (scrypt), enum parity test — test ผ่าน 50/50 | รอตรวจ |
