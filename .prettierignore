@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+coverage
+package-lock.json
+legacy/
+docs/samples/
+
+# ไม่ format markdown: prettier จะจัดความกว้างคอลัมน์ตารางใหม่
+# ซึ่งกับข้อความไทยทำให้ diff รกและอ่านยากกว่าเดิม
+*.md

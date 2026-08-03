@@ -1,0 +1,29 @@
+{
+  "name": "cert-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SSL Certificate Lifecycle Management System (multi-company)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "build:shared": "npm run build -w @cert-tracker/shared",
+    "dev:api": "npm run start:dev -w @cert-tracker/api",
+    "dev:web": "npm run dev -w @cert-tracker/web",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml,css,html}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml,css,html}\"",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f db"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  }
+}

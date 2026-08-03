@@ -1,0 +1,29 @@
+# Phase 0: มีแค่ service `db`
+# service `api` / `web` จะเพิ่มใน Phase 8 (Docker Compose production)
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cert-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-certtracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-certtracker}
+      POSTGRES_DB: ${POSTGRES_DB:-cert_tracker}
+      TZ: ${TZ:-Asia/Bangkok}
+      PGTZ: ${TZ:-Asia/Bangkok}
+    ports:
+      # host 5433 → container 5432 (กันชนกับ PostgreSQL ที่ติดตั้งบนเครื่องอยู่แล้ว)
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-certtracker} -d ${POSTGRES_DB:-cert_tracker}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata:
+    name: cert-tracker-pgdata

@@ -1,0 +1,13 @@
+// Phase 0: ตั้งค่าการเชื่อมต่อเท่านั้น — ยังไม่มี model
+// Model ทั้งหมด (Company, Site, Certificate, RenewalTask, HistoryLog,
+// Attachment, NotificationLog, ImportBatch, User) จะเพิ่มใน Phase 1
+// พร้อม migration แรก ตาม Data Model ใน CLAUDE.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

@@ -1,0 +1,14 @@
+# บังคับ LF ใน repo (ให้ตรงกับ .editorconfig และ prettier endOfLine: lf)
+# กัน prettier --check พังเมื่อ dev ใช้ Windows
+* text=auto eol=lf
+
+# ไฟล์ binary — ห้ามแตะ line ending
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
