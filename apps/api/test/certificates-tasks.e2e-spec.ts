@@ -583,6 +583,27 @@ describe('Certificates / Tasks / Dashboard (e2e) — Phase 4', () => {
       expect(response.body.byRiskStatus.HIGH.cancelled).toBe(1);
     });
 
+    it('กรองตามสถานะงาน → การ์ด/กราฟนับเฉพาะ cert ที่อยู่ในสถานะนั้น', async () => {
+      const cancelled = await get(
+        `/dashboard/summary?companyId=${companyId}&status=CANCELLED`,
+      ).expect(200);
+
+      // มีเพียงใบเดียวที่ task ล่าสุดถูกยกเลิกไว้ (high-20d)
+      expect(cancelled.body).toMatchObject({ status: 'CANCELLED', total: 1, cancelled: 1 });
+      expect(cancelled.body.byRisk).toEqual({ HIGH: 1, MEDIUM: 0, LOW: 0, SAFE: 0 });
+      expect(cancelled.body.noTask).toBe(0);
+
+      // สถานะที่ไม่มีใครอยู่ → ทุกตัวเลขเป็น 0 (ไม่ใช่ค่าของทั้งบริษัท)
+      const testing = await get(`/dashboard/summary?companyId=${companyId}&status=TESTING`).expect(
+        200,
+      );
+      expect(testing.body.total).toBe(0);
+    });
+
+    it('สถานะที่ไม่มีในระบบ → 400', async () => {
+      await get(`/dashboard/summary?companyId=${companyId}&status=DONE`).expect(400);
+    });
+
     it('กรองตามเดือนได้', async () => {
       const target = expiresInDays(200);
       const month = `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}`;

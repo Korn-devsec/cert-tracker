@@ -92,6 +92,7 @@ export class DashboardService {
       asOf: now.toISOString(),
       companyId: query.companyId ?? null,
       month: query.month ?? null,
+      status: query.status ?? null,
       total: rows.length,
       byRisk,
       byStatus,
@@ -116,6 +117,11 @@ export class DashboardService {
       const { gte, lt } = monthExpiryWindow(query.month);
       conditions.push(Prisma.sql`c."expiresAt" >= ${gte}`);
       conditions.push(Prisma.sql`c."expiresAt" < ${lt}`);
+    }
+    if (query.status !== undefined) {
+      // เงื่อนไขบน LEFT JOIN ทำให้ cert ที่ไม่มีงานถูกตัดออกไปด้วย ซึ่งถูกต้องแล้ว
+      // (cast เป็น text เพื่อไม่ต้องอ้างชื่อ enum type ใน SQL)
+      conditions.push(Prisma.sql`cur."status"::text = ${query.status}`);
     }
 
     return this.prisma.$queryRaw<SnapshotRow[]>(Prisma.sql`

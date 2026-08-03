@@ -128,10 +128,29 @@ describe('DashboardService.summary', () => {
   });
 
   it('สะท้อนตัวกรองที่ใช้กลับไปใน response', async () => {
-    const summary = await service.summary({ companyId: 'company-1', month: '2026-07' });
+    const summary = await service.summary({
+      companyId: 'company-1',
+      month: '2026-07',
+      status: WorkStatus.COMPLETED,
+    });
 
     expect(summary.companyId).toBe('company-1');
     expect(summary.month).toBe('2026-07');
+    expect(summary.status).toBe(WorkStatus.COMPLETED);
     expect(summary.asOf).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('ไม่ระบุ status → ไม่ใส่เงื่อนไขสถานะใน query (นับทุกสถานะ)', async () => {
+    await service.summary({});
+
+    const sql = prisma.$queryRaw.mock.calls[0][0] as { strings?: string[]; values: unknown[] };
+    expect(JSON.stringify(sql.values)).not.toContain('COMPLETED');
+  });
+
+  it('ระบุ status → ส่งค่าไปเป็น parameter ของ query (การ์ด/กราฟจึงเปลี่ยนตามตัวกรองเดียวกับตาราง)', async () => {
+    await service.summary({ status: WorkStatus.COMPLETED });
+
+    const sql = prisma.$queryRaw.mock.calls[0][0] as { values: unknown[] };
+    expect(sql.values).toContain(WorkStatus.COMPLETED);
   });
 });

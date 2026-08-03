@@ -16,6 +16,8 @@ export interface DashboardSummary {
   asOf: string;
   companyId: string | null;
   month: string | null;
+  /** ตัวกรองสถานะงานที่ใช้ (null = ทุกสถานะ) — สะท้อนกลับให้ frontend ยืนยันว่าตัวเลขชุดนี้คือของอะไร */
+  status: WorkStatus | null;
   total: number;
   byRisk: Record<RiskLevel, number>;
   /** นับตาม "task ล่าสุด" ของ cert แต่ละใบ (cert 1 ใบนับครั้งเดียว) */

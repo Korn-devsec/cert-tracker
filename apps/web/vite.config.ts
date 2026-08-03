@@ -9,7 +9,10 @@ export default defineConfig({
     strictPort: true,
   },
   test: {
-    environment: 'node',
+    // jsdom เพื่อให้เทสต์ระดับ component (render หน้า Dashboard จริง) ทำงานได้
+    // เทสต์ของฟังก์ชันล้วนก็รันบน jsdom ได้เหมือนกัน จึงใช้ค่าเดียวทั้งโปรเจกต์
+    environment: 'jsdom',
     include: ['src/**/*.spec.{ts,tsx}'],
+    restoreMocks: true,
   },
 });

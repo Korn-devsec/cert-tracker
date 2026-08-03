@@ -1,4 +1,5 @@
-import { IsOptional, IsUUID, Matches } from 'class-validator';
+import { WorkStatus } from '@prisma/client';
+import { IsEnum, IsOptional, IsUUID, Matches } from 'class-validator';
 import { MONTH_PATTERN } from '../../common/expiry-filter';
 
 export class DashboardSummaryDto {
@@ -11,4 +12,13 @@ export class DashboardSummaryDto {
   @IsOptional()
   @Matches(MONTH_PATTERN, { message: 'month ต้องอยู่ในรูปแบบ YYYY-MM เช่น 2026-07' })
   month?: string;
+
+  /**
+   * สถานะงานต่ออายุ (ดูจาก task ล่าสุดของ cert แต่ละใบ)
+   * ระบุแล้ว = นับเฉพาะ cert ที่อยู่ในสถานะนั้น เพื่อให้การ์ด/กราฟบน Dashboard
+   * เปลี่ยนตามตัวกรองชุดเดียวกับตาราง (`GET /certificates?status=`)
+   */
+  @IsOptional()
+  @IsEnum(WorkStatus, { message: 'status ไม่ใช่สถานะงานที่ระบบรู้จัก' })
+  status?: WorkStatus;
 }

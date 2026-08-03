@@ -4,7 +4,7 @@
 > ทำทีละเฟสตามลำดับ ติ๊ก `[x]` เมื่อเสร็จ และ**หยุดรอผู้ใช้ตรวจ**เมื่อจบแต่ละเฟส
 > ห้ามเริ่มเฟสถัดไปจนกว่าผู้ใช้จะพิมพ์ยืนยัน เช่น "ผ่าน เริ่มเฟสถัดไปได้"
 
-**สถานะปัจจุบัน:** Phase 0–4 ตรวจผ่านและ push แล้ว · Phase 5 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 6
+**สถานะปัจจุบัน:** Phase 0–5 ตรวจผ่านและ push แล้ว · Phase 6 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 7
 
 ---
 
@@ -236,21 +236,39 @@
 
 > อ้างอิงดีไซน์จาก `legacy/report-jul69.html` อย่างเคร่งครัด — ดู Design System ใน CLAUDE.md
 
-- [ ] ตั้งค่า theme กลาง: ฟอนต์ Sarabun, CSS variables สีทั้งหมด, การ์ด/badge/ตาราง เป็น shared components
-- [ ] Layout: sidebar เมนู (Dashboard, Companies, Certificates, Import, Tasks, Reports, Settings) + header
-- [ ] หน้า Login
-- [ ] หน้า Dashboard:
-  - การ์ดสรุป 4 ใบ (High/Medium/Low/Safe) หน้าตาเหมือน policy-card เดิม + การ์ดเพิ่ม: Total, Expiring Soon, Completed, Pending, Expired
-  - Doughnut chart สัดส่วนความเสี่ยง + Grouped bar สถานะงานรายกลุ่มความเสี่ยง (สไตล์เดิมเป๊ะ)
-  - ตัวกรอง: บริษัท (dropdown), เดือน (แสดง พ.ศ.), สถานะงาน — เลือกบริษัทแล้วทั้งหน้าเปลี่ยนเป็นของบริษัทนั้นทันที
-  - ตารางรายการ cert: ลำดับ, Common Name, วันคงเหลือ (สีตาม risk), badge ความเสี่ยง, สถานะภาษาไทย
-  - ปุ่มพิมพ์รายงาน + `@media print` เหมือนไฟล์เดิม
-- [ ] ทุกข้อมูลดึงจาก API เท่านั้น (React Query) — ห้ามมีข้อมูลฝังในโค้ดแม้แต่ตัวเดียว
+- [x] ตั้งค่า theme กลาง: ฟอนต์ Sarabun, CSS variables สีทั้งหมด, การ์ด/badge/ตาราง เป็น shared components
+      — `src/index.css` ถอดค่าจาก `legacy/report-jul69.html` ตรงตัว (สี, radius 12/16px, เงา,
+        แถบล่าง 5px, ตัวเลข 2.2rem, thead `#f1f5f9`, badge radius 6px) + ส่วนที่ไฟล์เดิมไม่มี (sidebar/ฟอร์ม)
+      — component ที่ใช้ซ้ำ: `Card`/`CardTitle`, `PolicyCard`, `RiskBadge`, `StateBlock`
+- [x] Layout: sidebar เมนู (Dashboard, Companies, Certificates, Import, Tasks, Reports, Settings) + header
+      — `AppLayout` + `Sidebar` (พื้น `--primary`, เมนูที่เลือกเป็นสีน้ำเงิน `--accent`) พร้อมชื่อผู้ใช้/role
+        และปุ่มออกจากระบบ · หน้าที่ยังไม่ทำใช้ `PlaceholderPage` บอกตรงๆ ว่าจะเสร็จเฟสไหน
+- [x] หน้า Login — เรียก `POST /auth/login`, เก็บ token, จำหน้าที่ตั้งใจเปิดไว้แล้วพากลับหลัง login
+- [x] หน้า Dashboard:
+  - [x] การ์ดสรุป 4 ใบ (High/Medium/Low/Safe) หน้าตาเหมือน policy-card เดิม + การ์ดเพิ่ม: Total, Expiring Soon, Completed, Pending, Expired
+        — ข้อความบนการ์ดทั้ง 4 ใบคัดลอกจากไฟล์เดิมทุกบรรทัด
+  - [x] Doughnut chart สัดส่วนความเสี่ยง + Grouped bar สถานะงานรายกลุ่มความเสี่ยง (สไตล์เดิมเป๊ะ)
+        — cutout 70%, borderWidth 0, datalabels ตัวหนาสีขาว 14px ซ่อนเลข 0, legend ล่าง,
+          bar: Done เขียว/Pending ส้ม borderRadius 4 ตัวเลขเหนือแท่งสี `#475569`, แกน y stepSize 1, ฟอนต์ Sarabun ทั้งกราฟ
+  - [x] ตัวกรอง: บริษัท (dropdown), เดือน (แสดง พ.ศ.), สถานะงาน — เลือกบริษัทแล้วทั้งหน้าเปลี่ยนเป็นของบริษัทนั้นทันที
+        — ตัวกรองทั้งสามถูกส่งไปทั้ง `/dashboard/summary` และ `/certificates` ชุดเดียวกัน
+        — **เพิ่ม `status` ให้ `/dashboard/summary`** เพื่อให้การ์ด/กราฟเปลี่ยนตามตัวกรองสถานะด้วย (ดู DECISIONS.md)
+        — รายการเดือนคำนวณจากวันที่ปัจจุบัน (ย้อน 3 / ล่วงหน้า 12 เดือน) + ตัวเลือก "ทุกเดือน" ไม่ hard-code
+  - [x] ตารางรายการ cert: ลำดับ, Common Name, วันคงเหลือ (สีตาม risk), badge ความเสี่ยง, สถานะภาษาไทย
+        — ใต้ CN แสดง endpoint + วันหมดอายุเป็น พ.ศ. · มีแบ่งหน้า (25 รายการ/หน้า) ใช้ `meta` จาก api
+  - [x] ปุ่มพิมพ์รายงาน + `@media print` เหมือนไฟล์เดิม (ซ่อน sidebar/ตัวกรอง/ปุ่ม, ตัดเงาการ์ด)
+- [x] ทุกข้อมูลดึงจาก API เท่านั้น (React Query) — ห้ามมีข้อมูลฝังในโค้ดแม้แต่ตัวเดียว
+      — `src/lib/api.ts` เป็นทางเดียวที่คุยกับ backend (แนบ JWT, 401 → ล้าง session)
+      — เทสต์ระดับหน้าจอจำลอง `fetch` ทั้งหมด: ถ้ามีข้อมูลฝังในโค้ดจะจับได้ทันที
 
 **เกณฑ์ตรวจรับ:**
-- เปิดหน้า Dashboard เทียบกับ `legacy/report-jul69.html` แล้วโทน/องค์ประกอบหลักเหมือนกัน
-- เปลี่ยน dropdown บริษัท → ตัวเลข การ์ด กราฟ ตาราง เปลี่ยนตามทันที
-- กดพิมพ์ → ได้รายงานสะอาดไม่มีปุ่ม/ตัวกรอง
+- [x] เปิดหน้า Dashboard เทียบกับ `legacy/report-jul69.html` แล้วโทน/องค์ประกอบหลักเหมือนกัน
+      — ค่าสี/ระยะทั้งหมดถอดจากไฟล์เดิม และมีเทสต์ยืนยันค่าคงที่ (สี risk, ลำดับ, ค่ากราฟ)
+      — **ข้อนี้ต้องตรวจด้วยตาอีกครั้ง**: เปิด `http://localhost:5173` เทียบกับไฟล์ใน `legacy/`
+- [x] เปลี่ยน dropdown บริษัท → ตัวเลข การ์ด กราฟ ตาราง เปลี่ยนตามทันที
+      — มีเทสต์อัตโนมัติ (`DashboardPage.spec.tsx`) ยืนยันว่าเรียก API ใหม่ด้วย `companyId` นั้น
+        ทั้ง summary และ certificates แล้วการ์ด/ตารางเปลี่ยนเป็นข้อมูลบริษัทใหม่
+- [x] กดพิมพ์ → ได้รายงานสะอาดไม่มีปุ่ม/ตัวกรอง — `@media print` ซ่อน `.sidebar/.controls/.btn/.pager`
 
 ---
 
@@ -294,4 +312,5 @@
 | 2026-08-03 | Phase 2 | JWT auth + RBAC (global guard, ปิดทุก endpoint เป็นค่าเริ่มต้น), Company CRUD + soft delete, Site CRUD, HistoryService เขียนประวัติใน transaction เดียวกับ mutation — test ผ่าน 97/97 (unit 78 + e2e 19) | ✅ ผ่าน (commit `3f154f0`) |
 | 2026-08-03 | Phase 3 | Excel Import Service: sheet/header auto-detect, header mapping (+typo `Onwer`), status ไทย (+trailing space), split endpoint หลายค่า, strict validation, upsert, ImportBatch + HistoryLog + RenewalTask อัตโนมัติ, `dryRun` preview — test ผ่าน 212/212 (unit 172 + e2e 40) | ✅ ผ่าน (commit `3866d77`) |
 | 2026-08-03 | Phase 4 | Certificate API (filter risk/month/status/search + pagination, risk คำนวณสด), Renewal workflow (transition guard + assign + ประวัติทุกขั้น), Attachment upload/download, `GET /dashboard/summary` (byRisk/byStatus/byRiskStatus) — test ผ่าน 388/388 (api unit 269 + api e2e 78 + shared 40 + web 1) | ✅ ผ่าน (commit `65c3749`) |
-| 2026-08-03 | Phase 5 | Notification Service: node-cron รายวัน (Asia/Bangkok), ขั้นบันได 90/60/30/≤7 ใน shared, adapter Email (nodemailer) + LINE (Messaging API) พร้อมโหมดซ้อม, idempotent ด้วย NotificationLog (upsert + ไม่นับแถวที่ล้มเหลว), ข้าม cert ที่งานเสร็จแล้ว, `POST /notifications/test-run` + `preview`, `GET /notifications`, ตัวช่วยวันที่ พ.ศ. ใน shared — test ผ่าน 469/469 (api unit 298 + api e2e 93 + shared 77 + web 1) | รอตรวจ |
+| 2026-08-03 | Phase 5 | Notification Service: node-cron รายวัน (Asia/Bangkok), ขั้นบันได 90/60/30/≤7 ใน shared, adapter Email (nodemailer) + LINE (Messaging API) พร้อมโหมดซ้อม, idempotent ด้วย NotificationLog (upsert + ไม่นับแถวที่ล้มเหลว), ข้าม cert ที่งานเสร็จแล้ว, `POST /notifications/test-run` + `preview`, `GET /notifications`, ตัวช่วยวันที่ พ.ศ. ใน shared — test ผ่าน 469/469 (api unit 298 + api e2e 93 + shared 77 + web 1) | ✅ ผ่าน (commit `fc2f41c`) |
+| 2026-08-03 | Phase 6 | Frontend: design system จาก legacy (Sarabun + CSS variables + policy card/badge/ตาราง), layout sidebar + header, หน้า Login, หน้า Dashboard ครบ (การ์ด 4+5 ใบ, Doughnut + Grouped Bar สไตล์เดิม, ตัวกรองบริษัท/เดือน พ.ศ./สถานะ, ตารางพร้อมแบ่งหน้า, ปุ่มพิมพ์ + `@media print`), ข้อมูลทั้งหมดผ่าน React Query, เพิ่ม `status` ให้ `/dashboard/summary` — test ผ่าน 508/508 (api unit 300 + api e2e 95 + shared 77 + web 36) | รอตรวจ |
