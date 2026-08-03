@@ -66,6 +66,157 @@ export interface CertificateListItem {
   currentTask: TaskSummary | null;
 }
 
+export interface CompanyDetail extends Company {
+  sites: Array<{ id: string; name: string }>;
+  _count: { certificates: number; sites: number };
+}
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  isActive: boolean;
+}
+
+export interface HistoryLogEntry {
+  id: string;
+  action: string;
+  actor: string;
+  detail: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface Attachment {
+  id: string;
+  certificateId: string;
+  filename: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+export interface RenewalTask {
+  id: string;
+  certificateId: string;
+  status: WorkStatus;
+  assigneeId: string | null;
+  dueDate: string | null;
+  note: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskDetailView extends RenewalTask {
+  assignee: { id: string; name: string; email: string; role: UserRole } | null;
+}
+
+/** 1 แถวในหน้า Tasks — มีข้อมูล cert พร้อมความเสี่ยงที่คำนวณสด */
+export interface TaskListItem extends TaskDetailView {
+  certificate: {
+    id: string;
+    commonName: string;
+    endpoint: string;
+    expiresAt: string;
+    owner: string | null;
+    daysUntilExpiry: number;
+    riskLevel: RiskLevel;
+    isExpired: boolean;
+    company: { id: string; name: string; code: string };
+  };
+}
+
+/** หน้า Certificate Detail: ข้อมูลเทคนิคครบ + งานทุกรอบ + ประวัติ + ไฟล์แนบ */
+export interface CertificateDetail extends CertificateListItem {
+  /** endpoint นี้คืน task แบบเต็ม (มี note/createdAt) ไม่ใช่แบบย่อเหมือนในตาราง */
+  currentTask: TaskDetailView | null;
+  san: string[];
+  serialNumber: string | null;
+  signatureAlgorithm: string | null;
+  keySize: number | null;
+  sha256Fingerprint: string | null;
+  remark: string | null;
+  issuedAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  renewalTasks: TaskDetailView[];
+  attachments: Attachment[];
+  historyLogs: HistoryLogEntry[];
+}
+
+// ===== นำเข้าข้อมูล =====
+
+export interface SheetInspection {
+  name: string;
+  headerRow: number | null;
+  dataRowCount: number;
+  mappedFieldCount: number;
+  importable: boolean;
+  missingRequired: string[];
+}
+
+export interface ImportInspectResult {
+  filename: string;
+  sheets: SheetInspection[];
+  suggestedSheet: string | null;
+}
+
+export interface RowIssue {
+  excelRow: number;
+  column?: string;
+  message: string;
+}
+
+export interface ImportPreviewRow {
+  excelRow: number;
+  commonName: string;
+  endpoint: string;
+  expiresAt: string;
+  daysUntilExpiry: number;
+  riskLevel: string;
+  owner: string | null;
+  issuer: string | null;
+  workStatus: string | null;
+  action: 'create' | 'update';
+}
+
+export interface ImportResult {
+  batchId: string | null;
+  dryRun: boolean;
+  status: string;
+  companyId: string;
+  filename: string;
+  sheetName: string;
+  headerRow: number;
+  scannedRows: number;
+  rowCount: number;
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  tasksCreated: number;
+  errors: RowIssue[];
+  warnings: RowIssue[];
+  preview: ImportPreviewRow[];
+}
+
+export interface ImportBatchSummary {
+  id: string;
+  filename: string;
+  sheetName: string | null;
+  importedBy: string;
+  rowCount: number;
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  status: string;
+  createdAt: string;
+  company: { code: string; name: string };
+}
+
 export interface RiskStatusBreakdown {
   done: number;
   pending: number;

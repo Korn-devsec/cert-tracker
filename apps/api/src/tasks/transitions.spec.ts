@@ -6,6 +6,7 @@ import {
   historyActionForStatus,
   isTerminal,
   OPEN_TASK_STATUSES,
+  transitionTableSize,
 } from './transitions';
 
 const ALL_STATUSES = Object.values(WorkStatus);
@@ -55,6 +56,12 @@ describe('transitions — เส้นทางที่อนุญาต', () 
   it('จำนวนคู่ที่อนุญาตทั้งหมด = 17 (ล็อกตารางไว้ ถ้าแก้กฎต้องแก้เทสต์ด้วย)', () => {
     const total = ALL_STATUSES.reduce((sum, status) => sum + ALLOWED_TRANSITIONS[status].length, 0);
     expect(total).toBe(17);
+  });
+
+  it('ตารางที่แปลงจาก packages/shared ครบทุกสถานะและตรงกับต้นฉบับ', () => {
+    // ตารางจริงอยู่ใน shared เพื่อให้ web ใช้ชุดเดียวกัน — ตรงนี้คุมว่าการแปลง enum ไม่ตกหล่น
+    expect(Object.keys(ALLOWED_TRANSITIONS).sort()).toEqual([...ALL_STATUSES].sort());
+    expect(transitionTableSize()).toBe(17);
   });
 });
 

@@ -1,57 +1,73 @@
 /**
  * กฎการเปลี่ยนสถานะงานต่ออายุ (workflow ที่คนอัปเดต — คนละเรื่องกับ RiskLevel ตามกฎเหล็กข้อ 5)
  *
- * เส้นทางหลักตาม CLAUDE.md:
- *   New → Assigned → In Progress → Waiting Vendor ⇄ Waiting CA → Testing → Completed
- *   ยกเลิกได้ทุกขั้น → Cancelled
+ * **ตารางเส้นทางอยู่ใน `packages/shared/src/workflow.ts`** เพื่อให้หน้า Tasks (Phase 7)
+ * แสดงปลายทางชุดเดียวกับที่ api ยอมรับ · ไฟล์นี้เหลือหน้าที่ 3 อย่าง:
+ *   1. แปลง enum ของ shared ↔ Prisma (ตามข้อตกลง Phase 2)
+ *   2. ข้อความอธิบายภาษาไทยเมื่อเปลี่ยนสถานะไม่ได้
+ *   3. เลือก HistoryAction ให้ตรงความหมายของสถานะปลายทาง
  *
- * เพิ่มจากเส้นทางหลัก 2 ทาง (บันทึกเหตุผลใน DECISIONS.md):
- *   - In Progress / Waiting * → Testing ได้โดยตรง เพราะ cert ที่ออกเอง (self-signed ซึ่งมีจริงในไฟล์)
- *     ไม่มีขั้นตอนติดต่อ vendor หรือรอ CA
- *   - Testing → In Progress ได้ เพราะทดสอบไม่ผ่านต้องกลับไปแก้ ไม่ใช่ยกเลิกงาน
- *
- * ไฟล์นี้เป็นฟังก์ชันล้วน (ไม่มี Nest/Prisma client) เพื่อเทสต์ทุกคู่สถานะได้ตรงๆ
+ * เหตุผลของเส้นทางที่เพิ่มจากสเปก (ข้ามไป Testing / ย้อนจาก Testing) อยู่ใน DECISIONS.md — Phase 4
  */
 import { HistoryAction, WorkStatus } from '@prisma/client';
+import {
+  ALLOWED_WORK_TRANSITIONS,
+  allowedNextWorkStatuses,
+  canTransitionWorkStatus,
+  isTerminalWorkStatus,
+  OPEN_WORK_STATUSES,
+  TERMINAL_WORK_STATUSES,
+  WorkStatus as SharedWorkStatus,
+} from '@cert-tracker/shared';
 import { workStatusLabel } from '../common/status-label';
 
+/** enum สองฝั่งมีค่าสตริงเดียวกัน (คุมด้วย enum-parity.spec.ts) จึงแปลงกลับไปมาได้ */
+function toShared(status: WorkStatus): SharedWorkStatus {
+  return status as unknown as SharedWorkStatus;
+}
+
+function toPrisma(status: SharedWorkStatus): WorkStatus {
+  return status as unknown as WorkStatus;
+}
+
 /** งานที่ยังไม่ปิด — ใช้ตัดสินว่า cert ใบนี้มีงานค้างอยู่แล้วหรือยัง */
-export const OPEN_TASK_STATUSES: WorkStatus[] = [
-  WorkStatus.NEW,
-  WorkStatus.ASSIGNED,
-  WorkStatus.IN_PROGRESS,
-  WorkStatus.WAITING_VENDOR,
-  WorkStatus.WAITING_CA,
-  WorkStatus.TESTING,
-];
+export const OPEN_TASK_STATUSES: WorkStatus[] = OPEN_WORK_STATUSES.map(toPrisma);
 
 /** สถานะปลายทาง เปลี่ยนต่อไม่ได้ — ถ้าต้องทำงานรอบใหม่ให้เปิด task ใบใหม่ */
-export const TERMINAL_TASK_STATUSES: WorkStatus[] = [WorkStatus.COMPLETED, WorkStatus.CANCELLED];
+export const TERMINAL_TASK_STATUSES: WorkStatus[] = TERMINAL_WORK_STATUSES.map(toPrisma);
 
+function nextOf(status: WorkStatus): readonly WorkStatus[] {
+  return allowedNextWorkStatuses(toShared(status)).map(toPrisma);
+}
+
+/** ตารางเส้นทาง (คีย์เป็น enum ของ Prisma เพื่อให้ service ใช้ได้ตรงๆ) — ค่ามาจาก shared ทั้งหมด */
 export const ALLOWED_TRANSITIONS: Record<WorkStatus, readonly WorkStatus[]> = {
-  [WorkStatus.NEW]: [WorkStatus.ASSIGNED, WorkStatus.CANCELLED],
-  [WorkStatus.ASSIGNED]: [WorkStatus.IN_PROGRESS, WorkStatus.CANCELLED],
-  [WorkStatus.IN_PROGRESS]: [
-    WorkStatus.WAITING_VENDOR,
-    WorkStatus.WAITING_CA,
-    WorkStatus.TESTING,
-    WorkStatus.CANCELLED,
-  ],
-  [WorkStatus.WAITING_VENDOR]: [WorkStatus.WAITING_CA, WorkStatus.TESTING, WorkStatus.CANCELLED],
-  [WorkStatus.WAITING_CA]: [WorkStatus.WAITING_VENDOR, WorkStatus.TESTING, WorkStatus.CANCELLED],
-  [WorkStatus.TESTING]: [WorkStatus.IN_PROGRESS, WorkStatus.COMPLETED, WorkStatus.CANCELLED],
-  [WorkStatus.COMPLETED]: [],
-  [WorkStatus.CANCELLED]: [],
+  [WorkStatus.NEW]: nextOf(WorkStatus.NEW),
+  [WorkStatus.ASSIGNED]: nextOf(WorkStatus.ASSIGNED),
+  [WorkStatus.IN_PROGRESS]: nextOf(WorkStatus.IN_PROGRESS),
+  [WorkStatus.WAITING_VENDOR]: nextOf(WorkStatus.WAITING_VENDOR),
+  [WorkStatus.WAITING_CA]: nextOf(WorkStatus.WAITING_CA),
+  [WorkStatus.TESTING]: nextOf(WorkStatus.TESTING),
+  [WorkStatus.COMPLETED]: nextOf(WorkStatus.COMPLETED),
+  [WorkStatus.CANCELLED]: nextOf(WorkStatus.CANCELLED),
 };
 
 export type TransitionCheck = { ok: true } | { ok: false; reason: string };
 
 export function isTerminal(status: WorkStatus): boolean {
-  return TERMINAL_TASK_STATUSES.includes(status);
+  return isTerminalWorkStatus(toShared(status));
 }
 
 export function canTransition(from: WorkStatus, to: WorkStatus): boolean {
-  return ALLOWED_TRANSITIONS[from].includes(to);
+  return canTransitionWorkStatus(toShared(from), toShared(to));
+}
+
+/** ยืนยันว่าตารางที่แปลงมาแล้วยังตรงกับต้นฉบับใน shared (กันความผิดพลาดตอน map) */
+export function transitionTableSize(): number {
+  return Object.values(SharedWorkStatus).reduce(
+    (sum, status) => sum + ALLOWED_WORK_TRANSITIONS[status].length,
+    0,
+  );
 }
 
 /** ตรวจการเปลี่ยนสถานะ พร้อมเหตุผลภาษาไทยที่บอกว่าจากสถานะนี้ไปไหนได้บ้าง */

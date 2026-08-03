@@ -13,6 +13,7 @@ import { ImportsModule } from './imports/imports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TasksModule } from './tasks/tasks.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { TasksModule } from './tasks/tasks.module';
     PrismaModule,
     HistoryModule,
     AuthModule,
+    UsersModule,
     CompaniesModule,
     ImportsModule,
     CertificatesModule,

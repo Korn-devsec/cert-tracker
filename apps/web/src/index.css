@@ -612,6 +612,456 @@ td {
   font-size: 0.85rem;
 }
 
+/* ===================== ส่วนที่เพิ่มใน Phase 7 (Companies / Import / Detail / Tasks / Users) ===================== */
+
+.stack-top {
+  margin-top: 24px;
+}
+
+.link {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.btn-secondary {
+  background: #ffffff;
+  color: var(--text);
+  border: 1px solid #cbd5e1;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--border-soft);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-family: 'Sarabun', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.btn-link:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.btn-link.danger {
+  color: var(--red);
+}
+
+.row-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.breadcrumb {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-badge);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.tag-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.tag-new {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.tag-update {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+/* --- Modal --- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(15 23 42 / 45%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 20px 40px -12px rgb(15 23 42 / 35%);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* --- หน้า Import --- */
+
+.import-step {
+  display: flex;
+  gap: 18px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.import-step .field {
+  min-width: 260px;
+  margin-bottom: 0;
+}
+
+.summary-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.summary-pill {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-policy-card);
+  padding: 10px 16px;
+  min-width: 130px;
+}
+
+.summary-pill span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.summary-pill strong {
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.warning-box {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.warning-box ul,
+.reject-detail ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.reject-detail {
+  margin-top: 16px;
+  font-size: 0.85rem;
+}
+
+.reject-detail h4 {
+  margin: 12px 0 4px;
+  font-size: 0.85rem;
+  color: var(--primary);
+}
+
+.import-done {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+/* --- หน้า Certificate Detail --- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.detail-side {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-risk {
+  text-align: right;
+}
+
+.detail-days {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.spec-list {
+  display: grid;
+  grid-template-columns: minmax(150px, auto) 1fr;
+  gap: 10px 16px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.spec-list dt {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.spec-list dd {
+  margin: 0;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.spec-list dd.mono {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.task-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.task-summary .cell-endpoint {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.task-note {
+  background: var(--border-soft);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+}
+
+.task-actions {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.task-actions.compact {
+  border-top: 1px dashed var(--border);
+  margin-top: 10px;
+}
+
+.task-action-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.task-action-row .field {
+  flex: 1;
+  min-width: 180px;
+  margin-bottom: 0;
+}
+
+.attachment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attachment-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* --- ไทม์ไลน์ประวัติ --- */
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.timeline li {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 16px;
+  position: relative;
+}
+
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 16px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.timeline li:last-child::before {
+  display: none;
+}
+
+.timeline-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.timeline-body {
+  font-size: 0.88rem;
+}
+
+.timeline-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.timeline-body p {
+  margin: 2px 0 0;
+  color: var(--text);
+}
+
+/* --- หน้า Tasks (board) --- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.board-column {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-policy-card);
+  padding: 14px;
+}
+
+.board-column-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.board-column-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.board-count {
+  background: var(--border-soft);
+  color: var(--text-th);
+  border-radius: var(--radius-badge);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.board-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.board-empty {
+  color: var(--text-faint);
+  text-align: center;
+  margin: 6px 0;
+}
+
+.board-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  background: #ffffff;
+}
+
+.board-card-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.board-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
 /* ===================== พิมพ์รายงาน (ตาม @media print ของไฟล์เดิม) ===================== */
 
 @media print {
@@ -673,5 +1123,9 @@ td {
   .policy-container,
   .stat-container {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
   }
 }

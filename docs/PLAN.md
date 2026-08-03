@@ -4,7 +4,7 @@
 > ทำทีละเฟสตามลำดับ ติ๊ก `[x]` เมื่อเสร็จ และ**หยุดรอผู้ใช้ตรวจ**เมื่อจบแต่ละเฟส
 > ห้ามเริ่มเฟสถัดไปจนกว่าผู้ใช้จะพิมพ์ยืนยัน เช่น "ผ่าน เริ่มเฟสถัดไปได้"
 
-**สถานะปัจจุบัน:** Phase 0–5 ตรวจผ่านและ push แล้ว · Phase 6 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 7
+**สถานะปัจจุบัน:** Phase 0–6 ตรวจผ่านและ push แล้ว · Phase 7 ทำเสร็จแล้ว — **รอผู้ใช้ตรวจรับ** ก่อนเริ่ม Phase 8
 
 ---
 
@@ -274,17 +274,35 @@
 
 ## Phase 7 — Frontend: Companies, Import, Certificate Detail, Tasks
 
-- [ ] หน้า Companies: list + สร้าง/แก้ไข/ปิดใช้งาน
-- [ ] หน้า Import: เลือกบริษัท (บังคับ) → upload .xlsx → แสดง preview ผล mapping →
+- [x] หน้า Companies: list + สร้าง/แก้ไข/ปิดใช้งาน
+      — รหัสบริษัทแก้ไม่ได้หลังสร้าง (ช่องถูกล็อกพร้อมคำอธิบาย) · ปิดใช้งาน = soft delete และเปิดกลับได้
+      — operator/viewer เห็นรายการแต่ไม่มีปุ่มจัดการ (ตรงกับ `@Roles(ADMIN)` ของ api)
+- [x] หน้า Import: เลือกบริษัท (บังคับ) → upload .xlsx → แสดง preview ผล mapping →
       ถ้า validate ไม่ผ่าน แสดง error ชัดเจน (คอลัมน์ไหนหาย/แถวไหนพัง) → confirm → สรุปผล import
-- [ ] หน้า Certificates: list + filter/search
-- [ ] หน้า Certificate Detail: ข้อมูลเทคนิคครบ (CN, SAN, Issuer, Serial, Algorithm, Key Size, SHA256, Endpoint, Owner), timeline History, Attachment upload, RenewalTask ปัจจุบัน
-- [ ] หน้า Tasks: มุมมองตาม workflow status (board หรือ list แบ่งกลุ่ม), เปลี่ยน status + assign ได้ตามสิทธิ์
-- [ ] หน้า Settings/Users (admin): จัดการผู้ใช้และ role
+      — 3 ขั้น: สำรวจไฟล์ (เห็นทุก sheet + แถว header + sheet ที่ระบบแนะนำ) → ตรวจ (dryRun) → ยืนยัน
+      — sheet ที่คอลัมน์ไม่ครบเลือกไม่ได้และบอกว่าขาดอะไร · เลือกโหมด strict/ผ่อนได้
+      — error แสดงคอลัมน์ที่หาย + ชื่อ header ที่ระบบยอมรับ + header ที่เจอในไฟล์ + แถวที่พังรายแถว
+      — มีตารางประวัติการนำเข้าท้ายหน้า
+- [x] หน้า Certificates: list + filter/search
+      — ค้นหา (CN/endpoint/owner/issuer) + กรองบริษัท/ความเสี่ยง/สถานะงาน/หมดอายุแล้ว + แบ่งหน้า
+- [x] หน้า Certificate Detail: ข้อมูลเทคนิคครบ (CN, SAN, Issuer, Serial, Algorithm, Key Size, SHA256, Endpoint, Owner), timeline History, Attachment upload, RenewalTask ปัจจุบัน
+      — timeline แปลง action เป็นคำอธิบายไทย พร้อมผู้ทำและเวลา · ไฟล์แนบดาวน์โหลดได้ (แนบ token ผ่าน blob)
+      — cert ที่ยังไม่มีงาน → เปิดงานต่ออายุได้จากหน้านี้ · ถ้ามีงานหลายรอบ แสดงตารางงานทุกรอบ
+- [x] หน้า Tasks: มุมมองตาม workflow status (board หรือ list แบ่งกลุ่ม), เปลี่ยน status + assign ได้ตามสิทธิ์
+      — board แบ่งคอลัมน์ตามลำดับ workflow · กรองบริษัท/ผู้รับผิดชอบ/ความเสี่ยง/ขอบเขต (ค้าง-ปิดแล้ว)
+      — **dropdown สถานะเสนอเฉพาะปลายทางที่กฎอนุญาต** เพราะตารางเส้นทางย้ายไปอยู่ใน `packages/shared`
+        ที่ api ใช้ตรวจ (ปุ่มบนจอกับกฎฝั่ง server จึงไม่หลุดจากกัน)
+- [x] หน้า Settings/Users (admin): จัดการผู้ใช้และ role
+      — **เพิ่ม `GET /users` + `PATCH /users/:id` ใน api** (สร้างผู้ใช้ยังใช้ `POST /auth/register` ของ Phase 2)
+      — สร้าง/เปลี่ยน role/ปิด-เปิดบัญชี/รีเซ็ตรหัสผ่าน · api กันปิดหรือลดสิทธิ์ตัวเอง และกันปิด admin คนสุดท้าย
+      — `GET /users` ยังใช้ทำ dropdown ผู้รับผิดชอบในหน้า Tasks (ADMIN + OPERATOR อ่านได้)
 
 **เกณฑ์ตรวจรับ:**
-- ทำ flow จริงครบวงจร: สร้างบริษัท → import Excel จริง → เห็นใน dashboard →
-  เปิด cert detail → assign task → เปลี่ยน status จน Completed → เห็น history ครบทุกขั้น
+- [x] ทำ flow จริงครบวงจร: สร้างบริษัท → import Excel จริง → เห็นใน dashboard →
+      เปิด cert detail → assign task → เปลี่ยน status จน Completed → เห็น history ครบทุกขั้น
+      — `test/full-flow.e2e-spec.ts` เดินทั้ง 6 ขั้นด้วย API ชุดเดียวกับที่หน้าจอเรียก (25 เคส)
+        รวมประวัติที่ต้องมีครบ: IMPORT → ASSIGN → STATUS_CHANGE → CSR_GENERATED → VERIFY → COMPLETE
+      — **การกดจริงบนหน้าจอต้องให้ผู้ใช้ตรวจอีกครั้ง** (ผมตรวจได้ถึงระดับ component test + API e2e)
 
 ---
 
@@ -313,4 +331,5 @@
 | 2026-08-03 | Phase 3 | Excel Import Service: sheet/header auto-detect, header mapping (+typo `Onwer`), status ไทย (+trailing space), split endpoint หลายค่า, strict validation, upsert, ImportBatch + HistoryLog + RenewalTask อัตโนมัติ, `dryRun` preview — test ผ่าน 212/212 (unit 172 + e2e 40) | ✅ ผ่าน (commit `3866d77`) |
 | 2026-08-03 | Phase 4 | Certificate API (filter risk/month/status/search + pagination, risk คำนวณสด), Renewal workflow (transition guard + assign + ประวัติทุกขั้น), Attachment upload/download, `GET /dashboard/summary` (byRisk/byStatus/byRiskStatus) — test ผ่าน 388/388 (api unit 269 + api e2e 78 + shared 40 + web 1) | ✅ ผ่าน (commit `65c3749`) |
 | 2026-08-03 | Phase 5 | Notification Service: node-cron รายวัน (Asia/Bangkok), ขั้นบันได 90/60/30/≤7 ใน shared, adapter Email (nodemailer) + LINE (Messaging API) พร้อมโหมดซ้อม, idempotent ด้วย NotificationLog (upsert + ไม่นับแถวที่ล้มเหลว), ข้าม cert ที่งานเสร็จแล้ว, `POST /notifications/test-run` + `preview`, `GET /notifications`, ตัวช่วยวันที่ พ.ศ. ใน shared — test ผ่าน 469/469 (api unit 298 + api e2e 93 + shared 77 + web 1) | ✅ ผ่าน (commit `fc2f41c`) |
-| 2026-08-03 | Phase 6 | Frontend: design system จาก legacy (Sarabun + CSS variables + policy card/badge/ตาราง), layout sidebar + header, หน้า Login, หน้า Dashboard ครบ (การ์ด 4+5 ใบ, Doughnut + Grouped Bar สไตล์เดิม, ตัวกรองบริษัท/เดือน พ.ศ./สถานะ, ตารางพร้อมแบ่งหน้า, ปุ่มพิมพ์ + `@media print`), ข้อมูลทั้งหมดผ่าน React Query, เพิ่ม `status` ให้ `/dashboard/summary` — test ผ่าน 508/508 (api unit 300 + api e2e 95 + shared 77 + web 36) | รอตรวจ |
+| 2026-08-03 | Phase 6 | Frontend: design system จาก legacy (Sarabun + CSS variables + policy card/badge/ตาราง), layout sidebar + header, หน้า Login, หน้า Dashboard ครบ (การ์ด 4+5 ใบ, Doughnut + Grouped Bar สไตล์เดิม, ตัวกรองบริษัท/เดือน พ.ศ./สถานะ, ตารางพร้อมแบ่งหน้า, ปุ่มพิมพ์ + `@media print`), ข้อมูลทั้งหมดผ่าน React Query, เพิ่ม `status` ให้ `/dashboard/summary` — test ผ่าน 508/508 (api unit 300 + api e2e 95 + shared 77 + web 36) | ✅ ผ่าน (commit `8c2dd88`) |
+| 2026-08-03 | Phase 7 | Frontend ครบทุกหน้า: Companies (CRUD + soft delete), Import 3 ขั้นพร้อมรายละเอียด error, Certificates + filter/search, Certificate Detail (ข้อมูลเทคนิค + timeline + ไฟล์แนบ + จัดการงาน), Tasks board, Settings/Users · api เพิ่ม `GET /users` + `PATCH /users/:id` และย้ายตาราง transition ไป `packages/shared` — test ผ่าน 591/591 (api unit 313 + api e2e 120 + shared 86 + web 72) | รอตรวจ |
